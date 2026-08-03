@@ -37,10 +37,23 @@ apt install -y mssql-server
 الخطوة 3: ارفع ملفات المشروع
 ----------------------------------------------------
 
-من جهازك:
-scp -r C:\MAS-ToDeliver\* root@<server-ip>:/var/www/mas/
+مهم: السيرفر مش محتاج .NET SDK ولا Visual Studio ولا الكود المصدري.
+هو محتاج الملفات المتبنية (published) بس.
 
-أو ارفعها بأي طريقة تانية (FileZilla, WinSCP, إلخ)
+طريقة 1 - من GitHub (الأسهل، ومش محتاجة تبني حاجة على جهازك):
+  افتح تاب Actions في الريبو -> آخر Build ناجح ->
+  انزل تحت لقسم Artifacts -> نزّل mas-web-publish
+  ده ZIP جواه التطبيق كامل جاهز للتشغيل.
+
+طريقة 2 - من جهازك:
+  dotnet publish src/MAS.Web/MAS.Web.csproj -c Release -o publish
+
+بعدها ارفع محتويات المجلد على السيرفر:
+scp -r publish/* root@<server-ip>:/var/www/mas/
+
+أو بأي طريقة تانية (FileZilla, WinSCP, إلخ)
+
+للتأكد إن الرفع تمام: لازم تلاقي ملف MAS.Web.dll جوه /var/www/mas/
 
 
 ----------------------------------------------------
@@ -95,6 +108,23 @@ systemctl status mas
 
 apt install -y nginx certbot python3-certbot-nginx
 
+### أ) إعداد الـ WebSocket (مهم جداً - من غيره الموقع مش هيشتغل)
+
+النظام Blazor Server، يعني بيشتغل باتصال WebSocket دايم مع السيرفر.
+عشان nginx يمرّر الاتصال ده صح، لازم الأول نضيف الـ map ده.
+
+nano /etc/nginx/conf.d/websocket.conf
+
+الصق:
+
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+
+### ب) إعداد الموقع
+
 nano /etc/nginx/sites-available/mas
 
 الصق (استبدل yourdomain.com بالدومين الفعلي):
@@ -102,18 +132,30 @@ nano /etc/nginx/sites-available/mas
 server {
     listen 80;
     server_name yourdomain.com www.yourdomain.com;
-    
+
     location / {
         proxy_pass http://localhost:5002;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection keep-alive;
+        proxy_set_header Connection $connection_upgrade;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+
+        # الاتصال بيفضل مفتوح طول ما الصفحة مفتوحة - من غير كده بيقطع كل دقيقة
+        proxy_read_timeout 100s;
+        proxy_send_timeout 100s;
+
         client_max_body_size 50M;
     }
 }
+
+
+>>> تنبيه: النسخ القديمة من الملف ده كان مكتوب فيها
+>>>   proxy_set_header Connection keep-alive;
+>>> وده بيمنع الـ WebSocket من الاشتغال خالص، والنتيجة صفحة بيضا
+>>> أو الموقع بيقطع كل شوية. لازم تكون $connection_upgrade زي فوق.
 
 
 احفظ ثم:
@@ -154,8 +196,9 @@ crontab -e
 
 افتح: https://yourdomain.com
 
-Email:    admin@maspos.com
-Password: Admin@123
+Username: admin
+Password: admin
+(ينفع تدخل بالإيميل admin@maspos.com بدل اسم المستخدم)
 
 ⚠️ غير الـ Password فوراً بعد أول تسجيل دخول
 
