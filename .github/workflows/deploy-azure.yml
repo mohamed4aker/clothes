@@ -1,0 +1,45 @@
+name: Deploy to Azure
+
+# النشر التلقائي على Azure App Service.
+#
+# مش هيشتغل غير لما تضبط الاتنين دول في إعدادات الريبو (الخطوات في AZURE_SETUP.md):
+#   1. Variable  اسمه AZURE_WEBAPP_NAME            = اسم الـ App Service بتاعك
+#   2. Secret    اسمه AZURE_WEBAPP_PUBLISH_PROFILE = محتوى ملف الـ publish profile
+#
+# قبل كده بيتخطى نفسه بهدوء من غير ما يفشل.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'claude/**']
+
+jobs:
+  deploy:
+    # الحارس: من غير اسم التطبيق مفيش نشر
+    if: vars.AZURE_WEBAPP_NAME != ''
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.webapp-url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: تجهيز .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish
+        run: dotnet publish src/MAS.Web/MAS.Web.csproj -c Release -o publish
+
+      - name: النشر على Azure
+        id: deploy
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: publish
+
+      - name: الرابط
+        run: echo "الموقع شغال على ${{ steps.deploy.outputs.webapp-url }}"

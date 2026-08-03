@@ -8,14 +8,45 @@ namespace MAS.Web.Services;
 /// </summary>
 public class FileLoggerProvider : ILoggerProvider
 {
-    private readonly string _filePath;
+    private readonly string? _filePath;
     private static readonly object _lock = new();
     private readonly ConcurrentDictionary<string, FileLogger> _loggers = new();
 
     public FileLoggerProvider(string logDirectory)
     {
-        Directory.CreateDirectory(logDirectory);
-        _filePath = Path.Combine(logDirectory, "errors.log");
+        // مجلد التطبيق مش دايماً بيبقى قابل للكتابة — على Azure App Service مثلاً
+        // التطبيق بيشتغل من حزمة read-only. فبنجرّب أكتر من مكان بالترتيب،
+        // ولو كلهم فشلوا بنطفّي الكتابة في ملف بدل ما نوقّع التطبيق من أوله.
+        foreach (var dir in CandidateDirectories(logDirectory))
+        {
+            try
+            {
+                Directory.CreateDirectory(dir);
+                var path = Path.Combine(dir, "errors.log");
+
+                // نتأكد إننا فعلاً نقدر نكتب، مش بس نعمل المجلد
+                File.AppendAllText(path, string.Empty);
+
+                _filePath = path;
+                return;
+            }
+            catch
+            {
+                // نجرّب اللي بعده
+            }
+        }
+    }
+
+    private static IEnumerable<string> CandidateDirectories(string preferred)
+    {
+        yield return preferred;
+
+        // Azure App Service بيحط المسار ده في متغير HOME وبيكون قابل للكتابة
+        var home = Environment.GetEnvironmentVariable("HOME");
+        if (!string.IsNullOrEmpty(home))
+            yield return Path.Combine(home, "LogFiles", "mas");
+
+        yield return Path.Combine(Path.GetTempPath(), "mas-logs");
     }
 
     public ILogger CreateLogger(string categoryName) =>
@@ -26,10 +57,10 @@ public class FileLoggerProvider : ILoggerProvider
     private class FileLogger : ILogger
     {
         private readonly string _category;
-        private readonly string _filePath;
+        private readonly string? _filePath;
         private readonly object _lock;
 
-        public FileLogger(string category, string filePath, object lockObj)
+        public FileLogger(string category, string? filePath, object lockObj)
         {
             _category = category;
             _filePath = filePath;
@@ -38,7 +69,8 @@ public class FileLoggerProvider : ILoggerProvider
 
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
-        public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Warning;
+        // لو ملقيناش مكان نكتب فيه، اللوجر بيبقى مطفّي
+        public bool IsEnabled(LogLevel logLevel) => _filePath != null && logLevel >= LogLevel.Warning;
 
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
             Exception? exception, Func<TState, Exception?, string> formatter)
