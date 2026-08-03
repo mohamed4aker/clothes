@@ -1,0 +1,22 @@
+@page "/"
+@inject UserSession Session
+@inject NavigationManager Nav
+
+@* الصفحة الرئيسية مجرد تحويل للداشبورد.
+   من غيرها الـ Router مكنش بيلاقي أي صفحة للمسار "/" وكان بيطلّع
+   "الصفحة المطلوبة غير موجودة" لأي حد بيفتح الدومين الرئيسي وهو مسجّل دخول.
+
+   ملحوظة: الصفحة دي مبتترسمش أصلاً غير لما المستخدم يكون مسجّل دخول،
+   لأن MainLayout بيعرض شاشة الدخول بدل @Body لو الجلسة فاضية. *@
+
+<PageTitle>MAS</PageTitle>
+
+<MudProgressLinear Indeterminate="true" />
+
+@code {
+    protected override void OnInitialized()
+    {
+        if (Session.IsAuthenticated)
+            Nav.NavigateTo("/dashboard", replace: true);
+    }
+}
