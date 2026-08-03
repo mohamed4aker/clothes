@@ -1,0 +1,69 @@
+@inject ICategoryService CategoryService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudTextField @bind-Value="model.CategoryName" Label="اسم التصنيف *" Variant="Variant.Outlined" Required="true" Class="mb-3" />
+        <MudTextField @bind-Value="model.CategoryNameEn" Label="الاسم بالإنجليزي" Variant="Variant.Outlined" Class="mb-3" />
+        <MudSelect T="int?" @bind-Value="model.ParentCategoryId" Label="التصنيف الأب (اختياري)" Variant="Variant.Outlined" Class="mb-3">
+            <MudSelectItem T="int?" Value="null">- بدون -</MudSelectItem>
+            @foreach (var cat in Categories.Where(c => Category == null || c.CategoryId != Category.CategoryId))
+            {
+                <MudSelectItem T="int?" Value="cat.CategoryId">@cat.CategoryName</MudSelectItem>
+            }
+        </MudSelect>
+        <MudTextField @bind-Value="model.Description" Label="الوصف" Variant="Variant.Outlined" Lines="2" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">إلغاء</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">حفظ</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public CategoryDto? Category { get; set; }
+    [Parameter] public List<CategoryDto> Categories { get; set; } = new();
+
+    private CreateCategoryRequest model = new() { ShowOnline = true };
+
+    protected override void OnInitialized()
+    {
+        if (Category != null)
+        {
+            model = new CreateCategoryRequest
+            {
+                CategoryName = Category.CategoryName,
+                CategoryNameEn = Category.CategoryNameEn,
+                ParentCategoryId = Category.ParentCategoryId,
+                ShowOnline = true
+            };
+        }
+    }
+
+    private async Task Submit()
+    {
+        if (string.IsNullOrWhiteSpace(model.CategoryName))
+        {
+            Snackbar.Add("ادخل اسم التصنيف", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            if (Category == null)
+                await CategoryService.CreateCategoryAsync(Session.BrandId, model);
+            else
+                await CategoryService.UpdateCategoryAsync(Category.CategoryId, Session.BrandId, model);
+            Snackbar.Add("تم الحفظ", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطأ: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

@@ -1,0 +1,94 @@
+@page "/login"
+@layout EmptyLayout
+@inject IAuthService AuthService
+@inject UserSession Session
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@inject ProtectedSessionStorage Storage
+
+<PageTitle>تسجيل الدخول - MAS</PageTitle>
+
+<div style="display: flex; justify-content: center; align-items: center; min-height: 100vh; background: linear-gradient(135deg, #92400e 0%, #b45309 100%);">
+    <MudPaper Class="pa-8" Style="width: 400px;" Elevation="10">
+        <div style="text-align: center; margin-bottom: 24px;">
+            <MudIcon Icon="@Icons.Material.Filled.Storefront" Size="Size.Large" Style="font-size: 80px; color: #92400e;" />
+            <MudText Typo="Typo.h4" Style="color: #92400e; font-weight: bold;">MAS</MudText>
+            <MudText Typo="Typo.subtitle1">نظام إدارة الأعمال</MudText>
+        </div>
+
+        <MudTextField @bind-Value="email" Label="البريد الإلكتروني أو اسم المستخدم" 
+                      Variant="Variant.Outlined" Class="mb-3"
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Email" />
+        
+        <MudTextField @bind-Value="password" Label="كلمة المرور" 
+                      Variant="Variant.Outlined" InputType="InputType.Password" Class="mb-3"
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Lock"
+                      OnKeyUp="@(async (e) => { if(e.Key == "Enter") await DoLogin(); })" />
+
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" FullWidth="true" 
+                   Size="Size.Large" OnClick="DoLogin" Disabled="@isLoading">
+            @if (isLoading)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+            }
+            else
+            {
+                <MudText>تسجيل الدخول</MudText>
+            }
+        </MudButton>
+
+    </MudPaper>
+</div>
+
+@code {
+    private string email = "";
+    private string password = "";
+    private bool isLoading = false;
+
+    protected override void OnInitialized()
+    {
+        // لو مسجل دخول بالفعل، روح للـ dashboard
+        if (Session.IsAuthenticated)
+            Nav.NavigateTo("/dashboard");
+    }
+
+    private async Task DoLogin()
+    {
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+        {
+            Snackbar.Add("ادخل البريد وكلمة المرور", Severity.Warning);
+            return;
+        }
+
+        isLoading = true;
+        try
+        {
+            var response = await AuthService.LoginAsync(new LoginRequest 
+            { 
+                Email = email, 
+                Password = password 
+            });
+
+            if (response != null)
+            {
+                Session.SetUser(response);
+                // احفظ الجلسة في المتصفح عشان متخرجش لو الصفحة اتعملها reload أو الـ circuit وقع
+                await Storage.SetAsync("mas_user", response);
+                Snackbar.Add($"مرحباً {response.FullName}", Severity.Success);
+                Nav.NavigateTo("/dashboard");
+            }
+            else
+            {
+                Snackbar.Add("بيانات الدخول غير صحيحة", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطأ: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

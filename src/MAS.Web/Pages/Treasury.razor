@@ -1,0 +1,198 @@
+@page "/treasury"
+@inject ISalesService SalesService
+@inject IPurchaseService PurchaseService
+@inject IExpenseService ExpenseService
+@inject UserSession Session
+
+<PageTitle>الخزنة - MAS</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">💰 الخزنة</MudText>
+
+<!-- فلتر الفترة -->
+<MudPaper Class="pa-3 mb-3">
+    <MudGrid AlignItems="AlignItems.Center">
+        <MudItem xs="12" md="3">
+            <MudSelect T="string" @bind-Value="selectedPeriod" Label="الفترة" Variant="Variant.Outlined" 
+                       Dense="true" @bind-Value:after="ChangePeriod">
+                <MudSelectItem Value="@("today")">اليوم</MudSelectItem>
+                <MudSelectItem Value="@("week")">هذا الأسبوع</MudSelectItem>
+                <MudSelectItem Value="@("month")">هذا الشهر</MudSelectItem>
+                <MudSelectItem Value="@("year")">هذه السنة</MudSelectItem>
+                <MudSelectItem Value="@("all")">كل الفترة</MudSelectItem>
+                <MudSelectItem Value="@("custom")">فترة مخصصة</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        @if (selectedPeriod == "custom")
+        {
+            <MudItem xs="12" md="3"><MudDatePicker @bind-Date="fromDate" Label="من" /></MudItem>
+            <MudItem xs="12" md="3"><MudDatePicker @bind-Date="toDate" Label="إلى" /></MudItem>
+            <MudItem xs="12" md="3"><MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="LoadData">عرض</MudButton></MudItem>
+        }
+    </MudGrid>
+</MudPaper>
+
+@if (loading) { <MudProgressLinear Indeterminate="true" /> }
+else
+{
+    <!-- الكروت الأساسية -->
+    <MudGrid>
+        <MudItem xs="12" md="3">
+            <MudPaper Class="pa-4 text-center" Style="background: linear-gradient(135deg, #92400e, #b45309); color: white; min-height: 130px;">
+                <MudIcon Icon="@Icons.Material.Filled.AccountBalanceWallet" Size="Size.Large" />
+                <MudText Typo="Typo.subtitle2" Style="color: rgba(255,255,255,0.9);">رصيد الخزنة</MudText>
+                <MudText Typo="Typo.h4" Style="font-weight: bold;">@balance.ToString("N2") ج</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudPaper Class="pa-4 text-center" Style="background: #ecfdf5; min-height: 130px;">
+                <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Color="Color.Success" Size="Size.Large" />
+                <MudText Typo="Typo.subtitle2">المبيعات</MudText>
+                <MudText Typo="Typo.h5" Color="Color.Success">@totalSales.ToString("N2") ج</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudPaper Class="pa-4 text-center" Style="background: #fef3c7; min-height: 130px;">
+                <MudIcon Icon="@Icons.Material.Filled.ShoppingCart" Color="Color.Warning" Size="Size.Large" />
+                <MudText Typo="Typo.subtitle2">المشتريات</MudText>
+                <MudText Typo="Typo.h5" Color="Color.Warning">@totalPurchases.ToString("N2") ج</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudPaper Class="pa-4 text-center" Style="background: #fee2e2; min-height: 130px;">
+                <MudIcon Icon="@Icons.Material.Filled.MoneyOff" Color="Color.Error" Size="Size.Large" />
+                <MudText Typo="Typo.subtitle2">المصاريف</MudText>
+                <MudText Typo="Typo.h5" Color="Color.Error">@totalExpenses.ToString("N2") ج</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <!-- التفاصيل -->
+    <MudGrid Class="mt-3">
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-3" Style="color: #16a34a;">⬆️ الإيرادات (الداخل)</MudText>
+                <MudTable Items="@inflows" Dense="true" Bordered="false">
+                    <HeaderContent>
+                        <MudTh>البند</MudTh>
+                        <MudTh>المبلغ</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.Item1</MudTd>
+                        <MudTd><strong style="color: green;">@context.Item2.ToString("N2") ج</strong></MudTd>
+                    </RowTemplate>
+                </MudTable>
+                <MudDivider Class="my-2" />
+                <div class="d-flex justify-space-between" style="padding: 8px;">
+                    <MudText Typo="Typo.subtitle1"><strong>إجمالي الإيرادات:</strong></MudText>
+                    <MudText Typo="Typo.h6" Color="Color.Success">@totalInflows.ToString("N2") ج</MudText>
+                </div>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-3" Style="color: #dc2626;">⬇️ المصروفات (الخارج)</MudText>
+                <MudTable Items="@outflows" Dense="true" Bordered="false">
+                    <HeaderContent>
+                        <MudTh>البند</MudTh>
+                        <MudTh>المبلغ</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.Item1</MudTd>
+                        <MudTd><strong style="color: red;">@context.Item2.ToString("N2") ج</strong></MudTd>
+                    </RowTemplate>
+                </MudTable>
+                <MudDivider Class="my-2" />
+                <div class="d-flex justify-space-between" style="padding: 8px;">
+                    <MudText Typo="Typo.subtitle1"><strong>إجمالي المصروفات:</strong></MudText>
+                    <MudText Typo="Typo.h6" Color="Color.Error">@totalOutflows.ToString("N2") ج</MudText>
+                </div>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <!-- صافي الرصيد -->
+    <MudPaper Class="pa-4 mt-3" Style="@BalanceStyle">
+        <MudGrid AlignItems="AlignItems.Center">
+            <MudItem xs="12" md="8">
+                <MudText Typo="Typo.h5">
+                    @if (balance >= 0)
+                    {
+                        <text>✅ الخزنة في حالة جيدة</text>
+                    }
+                    else
+                    {
+                        <text>⚠️ الخزنة في عجز</text>
+                    }
+                </MudText>
+                <MudText Typo="Typo.body2">
+                    صافي الرصيد = الإيرادات - المصروفات = @balance.ToString("N2") ج
+                </MudText>
+            </MudItem>
+            <MudItem xs="12" md="4" Class="text-center">
+                <MudText Typo="Typo.h3" Color="@(balance >= 0 ? Color.Success : Color.Error)">
+                    @balance.ToString("N2") ج
+                </MudText>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+}
+
+@code {
+    private decimal totalSales = 0;
+    private decimal totalPurchases = 0;
+    private decimal totalExpenses = 0;
+    private decimal balance => totalSales - totalPurchases - totalExpenses;
+    private string BalanceStyle => balance >= 0 
+        ? "background: #f0fdf4; border: 2px solid #16a34a;" 
+        : "background: #fef2f2; border: 2px solid #dc2626;";
+    private bool loading = true;
+    private string selectedPeriod = "month";
+    private DateTime? fromDate = DateTime.Now.AddMonths(-1);
+    private DateTime? toDate = DateTime.Now;
+
+    private List<(string, decimal)> inflows = new();
+    private List<(string, decimal)> outflows = new();
+    private decimal totalInflows => inflows.Sum(x => x.Item2);
+    private decimal totalOutflows => outflows.Sum(x => x.Item2);
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task ChangePeriod()
+    {
+        var now = DateTime.Now;
+        switch (selectedPeriod)
+        {
+            case "today": fromDate = now.Date; toDate = now.Date.AddDays(1); break;
+            case "week": fromDate = now.AddDays(-7); toDate = now; break;
+            case "month": fromDate = now.AddMonths(-1); toDate = now; break;
+            case "year": fromDate = now.AddYears(-1); toDate = now; break;
+            case "all": fromDate = new DateTime(2000, 1, 1); toDate = now; break;
+        }
+        if (selectedPeriod != "custom") await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        if (!Session.IsAuthenticated || !fromDate.HasValue || !toDate.HasValue) return;
+        loading = true;
+        try
+        {
+            totalSales = await SalesService.GetTotalSalesAsync(Session.BrandId, fromDate.Value, toDate.Value);
+            totalPurchases = await PurchaseService.GetTotalPurchasesAsync(Session.BrandId, fromDate.Value, toDate.Value);
+            totalExpenses = await ExpenseService.GetTotalExpensesAsync(Session.BrandId, fromDate.Value, toDate.Value);
+
+            inflows = new List<(string, decimal)>
+            {
+                ("المبيعات النقدية", totalSales)
+            };
+            outflows = new List<(string, decimal)>
+            {
+                ("فواتير المشتريات", totalPurchases),
+                ("المصاريف", totalExpenses)
+            };
+        }
+        catch { }
+        finally { loading = false; }
+    }
+}

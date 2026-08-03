@@ -1,0 +1,139 @@
+@page "/reset-data"
+@using Microsoft.EntityFrameworkCore
+@inject AppDbContext Context
+@inject UserSession Session
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageTitle>تصفير البيانات - MAS</PageTitle>
+
+<MudGrid Justify="Justify.Center">
+    <MudItem xs="12" md="8">
+        <MudPaper Class="pa-6">
+            <MudText Typo="Typo.h4" Class="mb-3" Color="Color.Error">⚠️ تصفير البيانات التجريبية</MudText>
+            
+            <MudAlert Severity="Severity.Warning" Class="mb-3">
+                <strong>تنبيه:</strong> هذه الصفحة تمسح كل البيانات التجريبية لتسليم النظام للعميل.
+            </MudAlert>
+
+            <MudText Typo="Typo.h6" Class="mb-2">سيتم مسح:</MudText>
+            <MudList T="string" Dense="true">
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">المنتجات والـ Variants (كل ما يظهر في POS)</MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">المخزون وحركات المخزون</MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">فواتير المبيعات والمشتريات والمرتجعات</MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">العملاء والموردين</MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">المصاريف والعروض</MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">جلسات الكاشير والجرد</MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">الطلبات الأونلاين</MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">التصنيع (الوصفات وأوامر الإنتاج)</MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">المخازن والتصنيفات</MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">مخزن أول المدة</MudListItem>
+            </MudList>
+
+            <MudText Typo="Typo.h6" Class="mb-2 mt-3">سيتم الاحتفاظ بـ:</MudText>
+            <MudList T="string" Dense="true">
+                <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success">المالك (Owner)</MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success">البراندات والفروع</MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success">المستخدم admin@maspos.com</MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success">وحدات القياس</MudListItem>
+            </MudList>
+
+            <MudDivider Class="my-4" />
+
+            <MudTextField @bind-Value="confirmText" 
+                          Label="اكتب 'تصفير' للتأكيد" 
+                          Variant="Variant.Outlined" 
+                          Class="mb-3" />
+
+            <MudButton Color="Color.Error" Variant="Variant.Filled" Size="Size.Large"
+                       Disabled="@(confirmText != "تصفير" || isResetting)"
+                       OnClick="ResetAll" StartIcon="@Icons.Material.Filled.DeleteForever">
+                @if (isResetting) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> }
+                else { <MudText>تصفير كل البيانات التجريبية</MudText> }
+            </MudButton>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private string confirmText = string.Empty;
+    private bool isResetting = false;
+
+    private async Task ResetAll()
+    {
+        if (confirmText != "تصفير") return;
+        isResetting = true;
+
+        try
+        {
+            // استخدام Raw SQL لمسح كل حاجة بالقوة - أسرع وأكفأ
+            // المسح بترتيب يحترم الـ Foreign Keys
+            
+            await Context.Database.ExecuteSqlRawAsync("DELETE FROM StockMovements");
+            await Context.Database.ExecuteSqlRawAsync("DELETE FROM InvoicePayments");
+            await Context.Database.ExecuteSqlRawAsync("DELETE FROM SalesInvoiceItems");
+            await Context.Database.ExecuteSqlRawAsync("DELETE FROM SalesInvoices");
+            
+            // Sales Returns
+            try { await Context.Database.ExecuteSqlRawAsync("DELETE FROM SalesReturnItems"); } catch {}
+            try { await Context.Database.ExecuteSqlRawAsync("DELETE FROM SalesReturns"); } catch {}
+            
+            // Purchase Returns
+            try { await Context.Database.ExecuteSqlRawAsync("DELETE FROM PurchaseReturnItems"); } catch {}
+            try { await Context.Database.ExecuteSqlRawAsync("DELETE FROM PurchaseReturns"); } catch {}
+            
+            // Purchases
+            await Context.Database.ExecuteSqlRawAsync("DELETE FROM PurchaseInvoiceItems");
+            await Context.Database.ExecuteSqlRawAsync("DELETE FROM PurchaseInvoices");
+            
+            // Initial Stocks
+            try { await Context.Database.ExecuteSqlRawAsync("DELETE FROM InitialStockItems"); } catch {}
+            try { await Context.Database.ExecuteSqlRawAsync("DELETE FROM InitialStocks"); } catch {}
+            
+            // Online Orders
+            try { await Context.Database.ExecuteSqlRawAsync("DELETE FROM OnlineOrderItems"); } catch {}
+            try { await Context.Database.ExecuteSqlRawAsync("DELETE FROM OnlineOrders"); } catch {}
+            
+            // Stock Takes
+            try { await Context.Database.ExecuteSqlRawAsync("DELETE FROM StockTakeItems"); } catch {}
+            try { await Context.Database.ExecuteSqlRawAsync("DELETE FROM StockTakes"); } catch {}
+            
+            // Cashier sessions, expenses, promotions
+            try { await Context.Database.ExecuteSqlRawAsync("DELETE FROM CashierSessions"); } catch {}
+            try { await Context.Database.ExecuteSqlRawAsync("DELETE FROM Expenses"); } catch {}
+            try { await Context.Database.ExecuteSqlRawAsync("DELETE FROM Promotions"); } catch {}
+            
+            // Manufacturing
+            try { await Context.Database.ExecuteSqlRawAsync("DELETE FROM ProductionMaterialUsages"); } catch {}
+            try { await Context.Database.ExecuteSqlRawAsync("DELETE FROM ProductionOrders"); } catch {}
+            try { await Context.Database.ExecuteSqlRawAsync("DELETE FROM BomItems"); } catch {}
+            try { await Context.Database.ExecuteSqlRawAsync("DELETE FROM BillOfMaterials"); } catch {}
+            
+            // Inventory
+            await Context.Database.ExecuteSqlRawAsync("DELETE FROM Inventory");
+            
+            // Products (يمسح Variants أوتوماتيكياً لو فيه Cascade)
+            try { await Context.Database.ExecuteSqlRawAsync("DELETE FROM ProductImages"); } catch {}
+            await Context.Database.ExecuteSqlRawAsync("DELETE FROM ProductVariants");
+            await Context.Database.ExecuteSqlRawAsync("DELETE FROM Products");
+            await Context.Database.ExecuteSqlRawAsync("DELETE FROM Categories");
+            
+            // Customers, Suppliers, Warehouses
+            await Context.Database.ExecuteSqlRawAsync("DELETE FROM Customers");
+            try { await Context.Database.ExecuteSqlRawAsync("DELETE FROM Suppliers"); } catch {}
+            try { await Context.Database.ExecuteSqlRawAsync("DELETE FROM Warehouses"); } catch {}
+
+            Snackbar.Add("✅ تم تصفير كل البيانات بنجاح", Severity.Success);
+            await Task.Delay(1500);
+            Nav.NavigateTo("/dashboard", forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطأ: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isResetting = false;
+        }
+    }
+}

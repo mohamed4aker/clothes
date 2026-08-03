@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>MAS.Web</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="MudBlazor" Version="6.11.2" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.Cookies" Version="2.2.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\MAS.Application\MAS.Application.csproj" />
+    <ProjectReference Include="..\MAS.Domain\MAS.Domain.csproj" />
+    <ProjectReference Include="..\MAS.Infrastructure\MAS.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

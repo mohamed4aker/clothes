@@ -1,0 +1,221 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject UserSession Session
+@inject NavigationManager Nav
+@inject ProtectedSessionStorage Storage
+
+<MudThemeProvider Theme="_theme" />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+@if (Session.IsAuthenticated)
+{
+    <MudLayout>
+        <MudAppBar Elevation="1" Color="Color.Primary">
+            <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
+            <MudText Typo="Typo.h6" Class="mr-3">MAS - @Session.BrandName</MudText>
+            <MudSpacer />
+            <MudIconButton Icon="@Icons.Material.Filled.SwapHorizontalCircle" Color="Color.Inherit" Title="تبديل البراند" OnClick="OpenBrandSwitch" />
+            <MudIconButton Icon="@Icons.Material.Filled.OpenInNew" Color="Color.Inherit" Title="عرض المتجر" OnClick="@(() => Nav.NavigateTo("/shop", true))" />
+            <MudText Class="ml-2">@Session.FullName</MudText>
+            <MudIconButton Icon="@Icons.Material.Filled.Settings" Color="Color.Inherit" Href="/settings" />
+            <MudIconButton Icon="@Icons.Material.Filled.Logout" Color="Color.Inherit" OnClick="Logout" />
+        </MudAppBar>
+        <MudDrawer @bind-Open="_drawerOpen" Anchor="Anchor.Right" Elevation="2" Variant="@DrawerVariant.Responsive" ClipMode="DrawerClipMode.Always">
+            <MudNavMenu>
+                <MudNavLink Href="/dashboard" Icon="@Icons.Material.Filled.Dashboard">لوحة التحكم</MudNavLink>
+                <MudNavLink Href="/pos" Icon="@Icons.Material.Filled.PointOfSale">نقطة البيع (POS)</MudNavLink>
+
+                <!-- المبيعات -->
+                <MudNavGroup Title="المبيعات" Icon="@Icons.Material.Filled.TrendingUp" Expanded="false">
+                    <MudNavLink Href="/sales" Icon="@Icons.Material.Filled.Receipt">فاتورة بيع</MudNavLink>
+                    <MudNavLink Href="/returns" Icon="@Icons.Material.Filled.AssignmentReturn">مرتجع بيع</MudNavLink>
+                    <MudNavLink Href="/reports?tab=sales" Icon="@Icons.Material.Filled.Analytics">تقرير المبيعات</MudNavLink>
+                </MudNavGroup>
+
+                <!-- المشتريات -->
+                <MudNavGroup Title="المشتريات" Icon="@Icons.Material.Filled.ShoppingCart" Expanded="false">
+                    <MudNavLink Href="/initial-stocks" Icon="@Icons.Material.Filled.PlaylistAdd">مخزن أول المدة</MudNavLink>
+                    <MudNavLink Href="/purchases" Icon="@Icons.Material.Filled.Receipt">فاتورة مشتريات</MudNavLink>
+                    <MudNavLink Href="/purchase-returns" Icon="@Icons.Material.Filled.AssignmentReturn">مرتجع مشتريات</MudNavLink>
+                    <MudNavLink Href="/reports?tab=purchases" Icon="@Icons.Material.Filled.Analytics">تقرير المشتريات</MudNavLink>
+                </MudNavGroup>
+
+                <!-- المخزون -->
+                <MudNavGroup Title="المخزون" Icon="@Icons.Material.Filled.Inventory" Expanded="false">
+                    <MudNavLink Href="/products" Icon="@Icons.Material.Filled.Inventory2">المنتج التام</MudNavLink>
+                    <MudNavLink Href="/raw-materials" Icon="@Icons.Material.Filled.Science">المنتج الخام</MudNavLink>
+                    <MudNavLink Href="/warehouses" Icon="@Icons.Material.Filled.Warehouse">المخازن</MudNavLink>
+                    <MudNavLink Href="/stocktakes" Icon="@Icons.Material.Filled.FactCheck">الجرد والتسوية</MudNavLink>
+                </MudNavGroup>
+
+                <!-- الأصناف -->
+                <MudNavGroup Title="الأصناف" Icon="@Icons.Material.Filled.Category" Expanded="false">
+                    <MudNavLink Href="/products" Icon="@Icons.Material.Filled.Add">إضافة صنف</MudNavLink>
+                    <MudNavLink Href="/categories" Icon="@Icons.Material.Filled.Category">التصنيفات</MudNavLink>
+                    <MudNavLink Href="/barcodes" Icon="@Icons.Material.Filled.QrCode">طباعة الباركود</MudNavLink>
+                    <MudNavLink Href="/stock-report" Icon="@Icons.Material.Filled.Storage">مخزون الأصناف</MudNavLink>
+                    <MudNavLink Href="/item-movement" Icon="@Icons.Material.Filled.SwapVert">حركة الصنف</MudNavLink>
+                    <MudNavLink Href="/top-products" Icon="@Icons.Material.Filled.Star">الأكثر مبيعاً</MudNavLink>
+                    <MudNavLink Href="/reports?tab=inventory" Icon="@Icons.Material.Filled.Analytics">تكلفة المخزون</MudNavLink>
+                </MudNavGroup>
+
+                <!-- التصنيع -->
+                <MudNavGroup Title="التصنيع" Icon="@Icons.Material.Filled.Factory" Expanded="false">
+                    <MudNavLink Href="/manufacturing/boms" Icon="@Icons.Material.Filled.Receipt">الوصفات</MudNavLink>
+                    <MudNavLink Href="/manufacturing/orders" Icon="@Icons.Material.Filled.Build">أوامر الإنتاج</MudNavLink>
+                </MudNavGroup>
+
+                <!-- الحسابات -->
+                <MudNavGroup Title="الحسابات" Icon="@Icons.Material.Filled.AccountBalance" Expanded="false">
+                    <MudNavLink Href="/treasury" Icon="@Icons.Material.Filled.AccountBalanceWallet">الخزنة</MudNavLink>
+                    <MudNavLink Href="/financial-operations" Icon="@Icons.Material.Filled.Payments">العمليات المالية</MudNavLink>
+                    <MudNavLink Href="/accounting-reports" Icon="@Icons.Material.Filled.Assessment">التقارير المحاسبية</MudNavLink>
+                    <MudNavLink Href="/cashier-sessions" Icon="@Icons.Material.Filled.PointOfSale">جلسات الكاشير</MudNavLink>
+                </MudNavGroup>
+
+                <!-- الموظفين -->
+                <MudNavGroup Title="الموظفين" Icon="@Icons.Material.Filled.Badge" Expanded="false">
+                    <MudNavLink Href="/users" Icon="@Icons.Material.Filled.PersonAdd">إضافة موظف</MudNavLink>
+                    <MudNavLink Href="/permissions" Icon="@Icons.Material.Filled.AdminPanelSettings">الصلاحيات</MudNavLink>
+                </MudNavGroup>
+
+                <!-- المصاريف -->
+                <MudNavLink Href="/expenses" Icon="@Icons.Material.Filled.MoneyOff">المصاريف</MudNavLink>
+
+                <!-- العملاء والموردين -->
+                <MudNavLink Href="/customers" Icon="@Icons.Material.Filled.People">العملاء</MudNavLink>
+                <MudNavLink Href="/suppliers" Icon="@Icons.Material.Filled.LocalShipping">الموردين</MudNavLink>
+
+                <!-- الموقع الإلكتروني -->
+                <MudNavGroup Title="🌐 الموقع الإلكتروني" Icon="@Icons.Material.Filled.Web" Expanded="false">
+                    <MudNavLink Href="/online-orders" Icon="@Icons.Material.Filled.LocalShipping">الطلبات الأونلاين</MudNavLink>
+                    <MudNavLink Href="/promotions" Icon="@Icons.Material.Filled.LocalOffer">العروض والكوبونات</MudNavLink>
+                </MudNavGroup>
+
+                <!-- الإعدادات -->
+                <MudNavGroup Title="الإعدادات" Icon="@Icons.Material.Filled.Settings" Expanded="false">
+                    <MudNavLink Href="/brands" Icon="@Icons.Material.Filled.Business">البراندات</MudNavLink>
+                    <MudNavLink Href="/branches" Icon="@Icons.Material.Filled.Store">الفروع</MudNavLink>
+                    <MudNavLink Href="/settings" Icon="@Icons.Material.Filled.Tune">إعدادات النظام</MudNavLink>
+<MudNavLink Href="/reset-data" Icon="@Icons.Material.Filled.DeleteForever">⚠️ تصفير البيانات</MudNavLink>
+                </MudNavGroup>
+            </MudNavMenu>
+        </MudDrawer>
+        <MudMainContent>
+            <MudContainer MaxWidth="MaxWidth.False" Class="pa-4">
+                <ErrorBoundary @ref="_errorBoundary">
+                    <ChildContent>
+                        @Body
+                    </ChildContent>
+                    <ErrorContent Context="ex">
+                        <MudAlert Severity="Severity.Error" Class="my-4">
+                            حصل خطأ في الصفحة دي. جرّب تاني أو ارجع للوحة التحكم.
+                        </MudAlert>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-2"
+                                   OnClick="@(() => { _errorBoundary?.Recover(); })">إعادة المحاولة</MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Default"
+                                   OnClick="@(() => { _errorBoundary?.Recover(); Nav.NavigateTo("/dashboard"); })">لوحة التحكم</MudButton>
+                    </ErrorContent>
+                </ErrorBoundary>
+            </MudContainer>
+        </MudMainContent>
+    </MudLayout>
+}
+else
+{
+    <div style="display: flex; justify-content: center; align-items: center; min-height: 100vh; background: linear-gradient(135deg, #92400e 0%, #b45309 100%);">
+        <MudPaper Class="pa-8" Style="width: 400px; text-align: center;" Elevation="10">
+            <MudIcon Icon="@Icons.Material.Filled.Storefront" Size="Size.Large" Style="font-size: 80px; color: #92400e;" />
+            <MudText Typo="Typo.h4" Style="color: #92400e; font-weight: bold;">MAS</MudText>
+            <MudText Typo="Typo.subtitle1" Class="mb-4">نظام إدارة الأعمال</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" OnClick="GoToLogin">
+                تسجيل الدخول
+            </MudButton>
+            <div style="margin-top: 16px;">
+                <MudButton Variant="Variant.Text" OnClick="GoToShop">🛍️ عرض المتجر الإلكتروني</MudButton>
+            </div>
+        </MudPaper>
+    </div>
+}
+
+@code {
+    private bool _drawerOpen = true;
+    private ErrorBoundary? _errorBoundary;
+
+    protected override void OnInitialized()
+    {
+        // لما المستخدم ينتقل لصفحة تانية، نصفّر حالة الخطأ عشان الصفحة الجديدة تفتح عادي
+        Nav.LocationChanged += HandleLocationChanged;
+    }
+
+    private void HandleLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        _errorBoundary?.Recover();
+    }
+
+    private MudTheme _theme = new MudTheme()
+    {
+        Palette = new PaletteLight()
+        {
+            Primary = "#92400e",
+            Secondary = "#b45309",
+            AppbarBackground = "#92400e",
+            Background = "#fef9f3",
+            DrawerBackground = "#ffffff",
+            DrawerText = "#1f2937"
+        },
+        Typography = new Typography()
+        {
+            Default = new Default() { FontFamily = new[] { "Cairo", "sans-serif" } }
+        }
+    };
+    
+    [Inject] IDialogService DialogService { get; set; } = null!;
+    private async Task OpenBrandSwitch()
+    {
+        await DialogService.ShowAsync<BrandSwitchDialog>("تبديل البراند", new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+    }
+    
+    private void DrawerToggle() => _drawerOpen = !_drawerOpen;
+
+    // لو الجلسة في الذاكرة فاضية (إعادة تحميل / الـ circuit وقع واتعمل من جديد)
+    // نحاول نسترجعها من تخزين المتصفح بدل ما نطلّع المستخدم برّه
+    private bool _triedRestore;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !Session.IsAuthenticated && !_triedRestore)
+        {
+            _triedRestore = true;
+            try
+            {
+                var result = await Storage.GetAsync<LoginResponse>("mas_user");
+                if (result.Success && result.Value is not null)
+                {
+                    Session.SetUser(result.Value);
+                    StateHasChanged();
+                }
+            }
+            catch
+            {
+                // لو فشل الاسترجاع لأي سبب، يفضل المستخدم على شاشة الدخول
+            }
+        }
+    }
+
+    private async Task Logout()
+    {
+        Session.Logout();
+        await Storage.DeleteAsync("mas_user");
+        Nav.NavigateTo("/login", true);
+    }
+
+    private void GoToLogin() => Nav.NavigateTo("/login");
+
+    public void Dispose()
+    {
+        Nav.LocationChanged -= HandleLocationChanged;
+    }
+    private void GoToShop() => Nav.NavigateTo("/shop");
+}

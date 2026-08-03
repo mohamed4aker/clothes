@@ -1,0 +1,87 @@
+@inject IExpenseService ExpenseService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudSelect @bind-Value="model.Category" Label="التصنيف *" Variant="Variant.Outlined">
+                    <MudSelectItem Value="@("إيجار")">إيجار</MudSelectItem>
+                    <MudSelectItem Value="@("كهرباء")">كهرباء</MudSelectItem>
+                    <MudSelectItem Value="@("مياه")">مياه</MudSelectItem>
+                    <MudSelectItem Value="@("رواتب")">رواتب</MudSelectItem>
+                    <MudSelectItem Value="@("نقل")">نقل</MudSelectItem>
+                    <MudSelectItem Value="@("صيانة")">صيانة</MudSelectItem>
+                    <MudSelectItem Value="@("تسويق")">تسويق</MudSelectItem>
+                    <MudSelectItem Value="@("إنترنت")">إنترنت</MudSelectItem>
+                    <MudSelectItem Value="@("تليفون")">تليفون</MudSelectItem>
+                    <MudSelectItem Value="@("أخرى")">أخرى</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudNumericField @bind-Value="model.Amount" Label="المبلغ *" Variant="Variant.Outlined" Min="0" Format="N2" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="model.Description" Label="الوصف *" Variant="Variant.Outlined" Required="true" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudDatePicker @bind-Date="expenseDate" Label="التاريخ *" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTimePicker @bind-Time="expenseTime" Label="الوقت" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudSelect @bind-Value="model.PaymentMethod" Label="طريقة الدفع" Variant="Variant.Outlined">
+                    <MudSelectItem Value="@("Cash")">كاش</MudSelectItem>
+                    <MudSelectItem Value="@("Visa")">فيزا</MudSelectItem>
+                    <MudSelectItem Value="@("BankTransfer")">تحويل بنكي</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.ReceiptNumber" Label="رقم الإيصال (اختياري)" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="model.Notes" Label="ملاحظات" Variant="Variant.Outlined" Lines="2" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">إلغاء</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">حفظ</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    private CreateExpenseRequest model = new() { PaymentMethod = "Cash" };
+    private DateTime? expenseDate = DateTime.Now;
+    private TimeSpan? expenseTime = DateTime.Now.TimeOfDay;
+
+    private async Task Submit()
+    {
+        if (string.IsNullOrWhiteSpace(model.Description) || model.Amount <= 0)
+        {
+            Snackbar.Add("ادخل الوصف والمبلغ", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            // دمج التاريخ والوقت
+            if (expenseDate.HasValue)
+            {
+                var dt = expenseDate.Value.Date;
+                if (expenseTime.HasValue) dt = dt.Add(expenseTime.Value);
+                model.ExpenseDate = dt;
+            }
+
+            await ExpenseService.CreateExpenseAsync(Session.BrandId, Session.UserId, model);
+            Snackbar.Add("تم حفظ المصروف", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { Snackbar.Add($"خطأ: {ex.Message}", Severity.Error); }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

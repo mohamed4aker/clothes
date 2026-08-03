@@ -1,0 +1,139 @@
+@page "/barcodes"
+@inject IProductService ProductService
+@inject UserSession Session
+@inject IJSRuntime JS
+
+<PageTitle>الباركود - MAS</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">📊 توليد وطباعة الباركود</MudText>
+
+<MudGrid>
+    <MudItem xs="12" md="4">
+        <MudPaper Class="pa-4">
+            <MudText Typo="Typo.h6" Class="mb-3">اختار المنتج</MudText>
+            <MudTextField @bind-Value="searchText" Placeholder="بحث..." 
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="true" Class="mb-2" />
+
+            @if (products != null)
+            {
+                <div style="max-height: 500px; overflow-y: auto;">
+                    @foreach (var product in FilteredProducts)
+                    {
+                        @foreach (var variant in product.Variants)
+                        {
+                            <MudPaper Class="pa-2 mb-1" Style="cursor: pointer;" 
+                                      @onclick="() => SelectVariant(product, variant)">
+                                <MudText Typo="Typo.body2" Style="font-weight: bold;">
+                                    @(variant.VariantName ?? product.ProductName)
+                                </MudText>
+                                <MudText Typo="Typo.caption">SKU: @variant.SKU</MudText>
+                            </MudPaper>
+                        }
+                    }
+                </div>
+            }
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="8">
+        <MudPaper Class="pa-4">
+            @if (selectedVariant == null)
+            {
+                <MudAlert Severity="Severity.Info">اختار منتج من القائمة على اليمين</MudAlert>
+            }
+            else
+            {
+                <MudGrid>
+                    <MudItem xs="12" md="6">
+                        <MudText Typo="Typo.h6">@selectedProductName</MudText>
+                        <MudText Typo="Typo.body2">SKU: @selectedSKU</MudText>
+                        <MudNumericField @bind-Value="copiesCount" Label="عدد النسخ" Min="1" Max="100" Variant="Variant.Outlined" Class="mt-2" />
+                        <MudButton Color="Color.Primary" Variant="Variant.Filled" 
+                                   StartIcon="@Icons.Material.Filled.Print" 
+                                   OnClick="PrintBarcodes" Class="mt-2">
+                            طباعة @copiesCount نسخة
+                        </MudButton>
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <div id="barcodeContainer" style="text-align: center; padding: 20px; background: white; border: 1px solid #ddd;">
+                            <svg id="barcodePreview"></svg>
+                            <div style="margin-top: 8px;">
+                                <strong>@selectedProductName</strong><br/>
+                                <small>@selectedSKU</small>
+                            </div>
+                        </div>
+                    </MudItem>
+                </MudGrid>
+            }
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private List<ProductDto>? products;
+    private string searchText = string.Empty;
+    private string? selectedVariant;
+    private string selectedProductName = string.Empty;
+    private string selectedSKU = string.Empty;
+    private int copiesCount = 30;
+
+    private List<ProductDto> FilteredProducts =>
+        products?.Where(p => string.IsNullOrEmpty(searchText) ||
+            p.ProductName.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+            p.SKU.Contains(searchText, StringComparison.OrdinalIgnoreCase)).ToList() ?? new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Session.IsAuthenticated)
+            products = await ProductService.GetProductsAsync(Session.BrandId);
+    }
+
+    private async Task SelectVariant(ProductDto product, ProductVariantDto variant)
+    {
+        selectedVariant = variant.SKU;
+        selectedProductName = variant.VariantName ?? product.ProductName;
+        selectedSKU = variant.SKU;
+        await Task.Delay(100);
+        await GenerateBarcode();
+    }
+
+    private async Task GenerateBarcode()
+    {
+        if (string.IsNullOrEmpty(selectedSKU)) return;
+        await JS.InvokeVoidAsync("eval", $@"
+            if (typeof JsBarcode !== 'undefined') {{
+                JsBarcode('#barcodePreview', '{selectedSKU}', {{
+                    format: 'CODE128',
+                    width: 2,
+                    height: 60,
+                    displayValue: true
+                }});
+            }}
+        ");
+    }
+
+    private async Task PrintBarcodes()
+    {
+        if (string.IsNullOrEmpty(selectedSKU)) return;
+
+        await JS.InvokeVoidAsync("eval", $@"
+            var WinPrint = window.open('', '', 'width=800,height=600');
+            WinPrint.document.write('<html><head><title>باركود</title>');
+            WinPrint.document.write('<script src=""https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js""><\/script>');
+            WinPrint.document.write('<style>body{{font-family:Arial;direction:rtl;}} .label{{display:inline-block;border:1px dashed #999;padding:8px;margin:4px;text-align:center;width:200px;}} svg{{max-width:100%;}}</style>');
+            WinPrint.document.write('</head><body>');
+            for (var i = 0; i < {copiesCount}; i++) {{
+                WinPrint.document.write('<div class=""label""><svg id=""bc_'+i+'""></svg><br/><strong>{selectedProductName}</strong><br/><small>{selectedSKU}</small></div>');
+            }}
+            WinPrint.document.write('</body></html>');
+            WinPrint.document.close();
+            WinPrint.onload = function() {{
+                for (var i = 0; i < {copiesCount}; i++) {{
+                    JsBarcode(WinPrint.document.getElementById('bc_'+i), '{selectedSKU}', {{ format: 'CODE128', width: 1.5, height: 50 }});
+                }}
+                setTimeout(function(){{ WinPrint.print(); }}, 500);
+            }};
+        ");
+    }
+}

@@ -1,0 +1,163 @@
+@inject IUserService UserService
+@inject IBranchService BranchService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.FullName" Label="الاسم الكامل *" Variant="Variant.Outlined" Required="true" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.Username" Label="اسم المستخدم *" Variant="Variant.Outlined" Required="true" Disabled="@(User != null)" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.Email" Label="البريد الإلكتروني" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.Phone" Label="الهاتف" Variant="Variant.Outlined" />
+            </MudItem>
+            @if (User == null)
+            {
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="model.Password" Label="كلمة المرور *" Variant="Variant.Outlined" InputType="InputType.Password" Required="true" />
+                </MudItem>
+            }
+            else
+            {
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="model.Password" Label="كلمة مرور جديدة (اختياري)" Variant="Variant.Outlined" InputType="InputType.Password"
+                                  HelperText="سيبها فاضية لو مش عايز تغيّر الباسورد" />
+                </MudItem>
+            }
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.PinCode" Label="PIN (4 أرقام)" Variant="Variant.Outlined" MaxLength="4" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudSelect @bind-Value="model.Role" Label="الدور *" Variant="Variant.Outlined" Required="true">
+                    <MudSelectItem Value="@("BrandAdmin")">مدير براند</MudSelectItem>
+                    <MudSelectItem Value="@("BranchManager")">مدير فرع</MudSelectItem>
+                    <MudSelectItem Value="@("Cashier")">كاشير</MudSelectItem>
+                    <MudSelectItem Value="@("Warehouse")">مخزن</MudSelectItem>
+                    <MudSelectItem Value="@("Accountant")">محاسب</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">الفروع المسموح بها:</MudText>
+                @if (branches != null)
+                {
+                    @foreach (var branch in branches)
+                    {
+                        <MudCheckBox T="bool" Value="@selectedBranchIds.Contains(branch.BranchId)" 
+                                     ValueChanged="@(checkedVal => ToggleBranch(branch.BranchId, checkedVal))" 
+                                     Label="@branch.BranchName" />
+                    }
+                }
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">إلغاء</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@isSaving">
+            @if (isSaving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> }
+            else { <MudText>حفظ</MudText> }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public UserDto? User { get; set; }
+
+    private CreateUserRequest model = new() { Role = "Cashier" };
+    private List<BranchDto>? branches;
+    private List<int> selectedBranchIds = new();
+    private bool isSaving = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        branches = await BranchService.GetBranchesAsync(Session.BrandId);
+
+        if (User != null)
+        {
+            model = new CreateUserRequest
+            {
+                Username = User.Username,
+                FullName = User.FullName,
+                Email = User.Email,
+                Phone = User.Phone,
+                Role = User.Role
+            };
+            selectedBranchIds = User.BranchIds.ToList();
+        }
+    }
+
+    private void ToggleBranch(int branchId, bool isChecked)
+    {
+        if (isChecked && !selectedBranchIds.Contains(branchId))
+            selectedBranchIds.Add(branchId);
+        else if (!isChecked)
+            selectedBranchIds.Remove(branchId);
+    }
+
+    private async Task Submit()
+    {
+        if (string.IsNullOrWhiteSpace(model.FullName) || string.IsNullOrWhiteSpace(model.Username))
+        {
+            Snackbar.Add("ادخل البيانات الأساسية", Severity.Warning);
+            return;
+        }
+
+        if (User == null && string.IsNullOrWhiteSpace(model.Password))
+        {
+            Snackbar.Add("ادخل كلمة المرور", Severity.Warning);
+            return;
+        }
+
+        if (!selectedBranchIds.Any())
+        {
+            Snackbar.Add("اختر فرع واحد على الأقل", Severity.Warning);
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            model.BranchIds = selectedBranchIds;
+
+            if (User == null)
+            {
+                await UserService.CreateUserAsync(Session.BrandId, model);
+            }
+            else
+            {
+                var updateModel = new UpdateUserRequest
+                {
+                    FullName = model.FullName,
+                    Email = model.Email,
+                    Phone = model.Phone,
+                    Role = model.Role,
+                    PinCode = model.PinCode,
+                    BranchIds = selectedBranchIds,
+                    IsActive = true,
+                    Password = string.IsNullOrWhiteSpace(model.Password) ? null : model.Password
+                };
+                await UserService.UpdateUserAsync(User.UserId, Session.BrandId, updateModel);
+            }
+
+            Snackbar.Add("تم الحفظ", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطأ: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

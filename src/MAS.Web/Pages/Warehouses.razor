@@ -1,0 +1,116 @@
+@page "/warehouses"
+@inject IWarehouseService WarehouseService
+@inject IBranchService BranchService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>المخازن - MAS</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12" Class="d-flex justify-space-between align-center">
+        <MudText Typo="Typo.h4">📦 المخازن</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAdd">
+            إضافة مخزن
+        </MudButton>
+    </MudItem>
+</MudGrid>
+
+<MudPaper Class="pa-4 mt-3">
+    @if (warehouses == null) { <MudProgressLinear Indeterminate="true" /> }
+    else if (!warehouses.Any())
+    {
+        <MudAlert Severity="Severity.Info">
+            لا يوجد مخازن. ضيف مخزن للمنتجات التامة وآخر للخامات.
+        </MudAlert>
+    }
+    else
+    {
+        <MudTable Items="@warehouses" Hover="true" Bordered="true">
+            <HeaderContent>
+                <MudTh>الكود</MudTh>
+                <MudTh>اسم المخزن</MudTh>
+                <MudTh>النوع</MudTh>
+                <MudTh>الفرع</MudTh>
+                <MudTh>المسؤول</MudTh>
+                <MudTh>الهاتف</MudTh>
+                <MudTh>رئيسي</MudTh>
+                <MudTh>الإجراءات</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.WarehouseCode</MudTd>
+                <MudTd><strong>@context.WarehouseName</strong></MudTd>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small" Color="@GetTypeColor(context.WarehouseType)">
+                        @TranslateType(context.WarehouseType)
+                    </MudChip>
+                </MudTd>
+                <MudTd>@context.BranchName</MudTd>
+                <MudTd>@context.ManagerName</MudTd>
+                <MudTd>@context.Phone</MudTd>
+                <MudTd>
+                    @if (context.IsMainWarehouse) { <MudIcon Icon="@Icons.Material.Filled.Star" Color="Color.Warning" /> }
+                </MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => OpenEdit(context))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => Delete(context))" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private List<WarehouseDto>? warehouses;
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        if (Session.IsAuthenticated)
+            warehouses = await WarehouseService.GetWarehousesAsync(Session.BrandId);
+    }
+
+    private async Task OpenAdd()
+    {
+        var dialog = DialogService.Show<WarehouseDialog>("إضافة مخزن", new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadData();
+    }
+
+    private async Task OpenEdit(WarehouseDto w)
+    {
+        var parameters = new DialogParameters { ["Warehouse"] = w };
+        var dialog = DialogService.Show<WarehouseDialog>("تعديل المخزن", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadData();
+    }
+
+    private async Task Delete(WarehouseDto w)
+    {
+        var confirm = await DialogService.ShowMessageBox("تأكيد", $"حذف المخزن {w.WarehouseName}؟", yesText: "حذف", cancelText: "إلغاء");
+        if (confirm == true)
+        {
+            await WarehouseService.DeleteWarehouseAsync(w.WarehouseId, Session.BrandId);
+            Snackbar.Add("تم الحذف", Severity.Success);
+            await LoadData();
+        }
+    }
+
+    private string TranslateType(string type) => type switch
+    {
+        "Finished" => "منتجات تامة",
+        "RawMaterial" => "خامات",
+        "Mixed" => "مختلط",
+        _ => type
+    };
+
+    private Color GetTypeColor(string type) => type switch
+    {
+        "Finished" => Color.Success,
+        "RawMaterial" => Color.Warning,
+        "Mixed" => Color.Info,
+        _ => Color.Default
+    };
+}

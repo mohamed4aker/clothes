@@ -1,0 +1,53 @@
+@inject ICashierSessionService SessionService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudPaper Class="pa-2 mb-2" Style="background: #fef3c7;">
+            <MudText Typo="Typo.subtitle2">رصيد الافتتاح: @SessionData.OpeningBalance.ToString("N2") ج</MudText>
+            <MudText Typo="Typo.subtitle2">إجمالي الكاش من الفواتير: @SessionData.TotalCash.ToString("N2") ج</MudText>
+            <MudText Typo="Typo.h6">المتوقع في الدرج: @((SessionData.OpeningBalance + SessionData.TotalCash).ToString("N2")) ج</MudText>
+        </MudPaper>
+        <MudNumericField @bind-Value="counted" Label="الكاش الفعلي في الدرج (عدّه) *" Variant="Variant.Outlined" Min="0" Format="N2" Required="true" />
+        @if (counted > 0)
+        {
+            var diff = counted - (SessionData.OpeningBalance + SessionData.TotalCash);
+            <MudPaper Class="pa-2 mt-2" Style="@($"background: {(diff == 0 ? "#ecfdf5" : "#fee2e2")};")">
+                <MudText Typo="Typo.h6">الفرق: <strong style="color: @(diff == 0 ? "green" : "red");">@diff.ToString("N2") ج</strong></MudText>
+                @if (diff > 0) { <MudText Typo="Typo.caption">زيادة في الدرج</MudText> }
+                else if (diff < 0) { <MudText Typo="Typo.caption">عجز في الدرج</MudText> }
+                else { <MudText Typo="Typo.caption" Color="Color.Success">مظبوط 100%</MudText> }
+            </MudPaper>
+        }
+        <MudTextField @bind-Value="notes" Label="ملاحظات" Variant="Variant.Outlined" Class="mt-3" Lines="2" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">إلغاء</MudButton>
+        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="Submit">قفل الجلسة</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public CashierSessionDto SessionData { get; set; } = null!;
+    private decimal counted = 0;
+    private string? notes;
+
+    private async Task Submit()
+    {
+        try
+        {
+            await SessionService.CloseSessionAsync(Session.UserId, new CloseSessionRequest
+            {
+                SessionId = SessionData.SessionId,
+                CountedCash = counted,
+                Notes = notes
+            });
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { Snackbar.Add($"خطأ: {ex.Message}", Severity.Error); }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

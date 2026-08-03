@@ -1,0 +1,37 @@
+@inject ICashierSessionService SessionService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudNumericField @bind-Value="balance" Label="رصيد الافتتاح (الكاش الموجود في الدرج) *" Variant="Variant.Outlined" Min="0" Format="N2" Required="true" />
+        <MudTextField @bind-Value="notes" Label="ملاحظات" Variant="Variant.Outlined" Class="mt-3" Lines="2" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">إلغاء</MudButton>
+        <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="Submit">فتح الجلسة</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    private decimal balance = 0;
+    private string? notes;
+
+    private async Task Submit()
+    {
+        try
+        {
+            await SessionService.OpenSessionAsync(Session.UserId, new OpenSessionRequest
+            {
+                BranchId = Session.CurrentBranchId,
+                OpeningBalance = balance,
+                Notes = notes
+            });
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { Snackbar.Add($"خطأ: {ex.Message}", Severity.Error); }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

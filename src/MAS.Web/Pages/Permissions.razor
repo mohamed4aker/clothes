@@ -1,0 +1,81 @@
+@page "/permissions"
+@inject UserSession Session
+
+<PageTitle>الصلاحيات - MAS</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">🔐 الصلاحيات</MudText>
+
+<MudPaper Class="pa-4">
+    <MudText Typo="Typo.h6" Class="mb-3">الأدوار في النظام</MudText>
+    
+    <MudGrid>
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-3" Style="background: #fef3c7;">
+                <MudText Typo="Typo.h6">👑 مالك (Owner)</MudText>
+                <MudText Typo="Typo.body2">صلاحيات كاملة على كل شيء</MudText>
+                <ul style="margin: 8px 0;">
+                    <li>إدارة البراندات والفروع</li>
+                    <li>إضافة وحذف الموظفين</li>
+                    <li>كل التقارير والإعدادات</li>
+                    <li>تصفير البيانات</li>
+                </ul>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-3" Style="background: #dbeafe;">
+                <MudText Typo="Typo.h6">⚙️ مدير براند (BrandAdmin)</MudText>
+                <MudText Typo="Typo.body2">إدارة براند واحد بكل تفاصيله</MudText>
+                <ul style="margin: 8px 0;">
+                    <li>المنتجات والمخزون</li>
+                    <li>المبيعات والمشتريات</li>
+                    <li>التقارير</li>
+                    <li>إدارة المستخدمين تحت البراند</li>
+                </ul>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-3" Style="background: #f0fdf4;">
+                <MudText Typo="Typo.h6">🏪 مدير فرع (BranchManager)</MudText>
+                <MudText Typo="Typo.body2">إدارة فرع واحد</MudText>
+                <ul style="margin: 8px 0;">
+                    <li>المنتجات (عرض وتعديل)</li>
+                    <li>المبيعات</li>
+                    <li>تقارير الفرع</li>
+                    <li>العملاء</li>
+                </ul>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-3" Style="background: #fee2e2;">
+                <MudText Typo="Typo.h6">💰 كاشير (Cashier)</MudText>
+                <MudText Typo="Typo.body2">نقطة البيع فقط</MudText>
+                <ul style="margin: 8px 0;">
+                    <li>POS</li>
+                    <li>عرض المنتجات</li>
+                    <li>إضافة عملاء</li>
+                    <li>جلسات الدرج</li>
+                </ul>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudAlert Severity="Severity.Info" Class="mt-3">
+        💡 لتغيير صلاحيات موظف، روح لصفحة "إدارة الموظفين" واختار الدور المناسب.
+    </MudAlert>
+</MudPaper>
+
+<MudPaper Class="pa-4 mt-3">
+    <MudText Typo="Typo.h6" Class="mb-2">دورك الحالي</MudText>
+    <MudChip T="string" Color="Color.Primary" Size="Size.Large">@TranslateRole(Session.Role)</MudChip>
+</MudPaper>
+
+@code {
+    private string TranslateRole(string role) => role switch
+    {
+        "Owner" => "مالك (Owner)",
+        "BrandAdmin" => "مدير براند",
+        "BranchManager" => "مدير فرع",
+        "Cashier" => "كاشير",
+        _ => role
+    };
+}

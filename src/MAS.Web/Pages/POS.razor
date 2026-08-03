@@ -1,0 +1,463 @@
+@page "/pos"
+@inject IProductService ProductService
+@inject ISalesService SalesService
+@inject ICustomerService CustomerService
+@inject IBrandSettingsService SettingsService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>نقطة البيع - MAS</PageTitle>
+
+<style>
+    .pos-product-card {
+        cursor: pointer;
+        height: 100%;
+        transition: transform 0.1s;
+        border: 2px solid transparent;
+    }
+    .pos-product-card:hover {
+        transform: scale(1.02);
+        border-color: #92400e;
+    }
+    .pos-product-img {
+        width: 100%;
+        height: 80px;
+        object-fit: cover;
+        border-radius: 4px;
+        background: #f3f4f6;
+    }
+    .pos-no-img {
+        width: 100%;
+        height: 80px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f3f4f6;
+        color: #9ca3af;
+        border-radius: 4px;
+        font-size: 32px;
+    }
+    .cart-item-row {
+        display: flex;
+        align-items: center;
+        padding: 6px;
+        border-bottom: 1px solid #e5e7eb;
+    }
+</style>
+
+<MudGrid>
+    <!-- العمود الأيمن: المنتجات -->
+    <MudItem xs="12" md="@productsCol">
+        <MudPaper Class="pa-2" Style="height: calc(100vh - 90px); overflow-y: auto;">
+            <div class="d-flex align-center mb-2">
+                <MudTextField @ref="barcodeField" @bind-Value="barcodeInput" 
+                              Label="🔍 امسح الباركود أو ابحث (Scanner)"
+                              HelperText="استخدم سكانر الباركود أو اكتب يدوياً ثم Enter"
+                              Variant="Variant.Outlined" Class="flex-grow-1"
+                              OnKeyUp="@OnSearchKeyUp" 
+                              Immediate="true" 
+                              AutoFocus="true"
+                              Margin="Margin.Dense" />
+                <MudIconButton Icon="@Icons.Material.Filled.ZoomOut" Size="Size.Small" 
+                               Title="تصغير" OnClick="ZoomOut" />
+                <MudIconButton Icon="@Icons.Material.Filled.ZoomIn" Size="Size.Small" 
+                               Title="تكبير" OnClick="ZoomIn" />
+            </div>
+
+            @if (filteredProducts != null)
+            {
+                <MudGrid Spacing="1">
+                    @foreach (var product in filteredProducts.Take(50))
+                    {
+                        @foreach (var variant in product.Variants.Where(v => !settings.HideZeroStockProducts || v.TotalStock > 0))
+                        {
+                            <MudItem xs="@cardSize" sm="@cardSize" md="@cardSize">
+                                <MudPaper Class="pos-product-card pa-1" @onclick="() => AddToCart(product, variant)">
+                                    @if (settings.ShowProductImages && !string.IsNullOrEmpty(product.MainImageUrl))
+                                    {
+                                        <img src="@product.MainImageUrl" class="pos-product-img" />
+                                    }
+                                    else
+                                    {
+                                        <div class="pos-no-img">📦</div>
+                                    }
+                                    <MudText Typo="Typo.body2" Style="font-weight: bold; font-size: 12px;">
+                                        @(variant.VariantName ?? product.ProductName)
+                                    </MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Primary" Style="font-weight: bold;">
+                                        @variant.SellingPrice?.ToString("N2") ج
+                                    </MudText>
+                                    <MudText Typo="Typo.caption" Style="font-size: 10px;">
+                                        المخزون: @variant.TotalStock
+                                    </MudText>
+                                </MudPaper>
+                            </MudItem>
+                        }
+                    }
+                </MudGrid>
+            }
+        </MudPaper>
+    </MudItem>
+
+    <!-- العمود الأيسر: السلة -->
+    <MudItem xs="12" md="@cartCol">
+        <MudPaper Class="pa-2" Style="height: calc(100vh - 90px); display: flex; flex-direction: column;">
+            <!-- العميل -->
+            <div class="d-flex align-center mb-2">
+                <MudText Typo="Typo.h6">🛒 السلة</MudText>
+                <MudSpacer />
+                @if (selectedCustomer != null)
+                {
+                    <MudChip T="string" Color="Color.Primary" OnClose="@(() => ClearCustomer())">@selectedCustomer.FullName</MudChip>
+                }
+                else
+                {
+                    <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.Person" 
+                               OnClick="SelectCustomer" Color="Color.Primary" Variant="Variant.Outlined">
+                        عميل
+                    </MudButton>
+                    <MudIconButton Icon="@Icons.Material.Filled.PersonAdd" Size="Size.Small" 
+                                   Color="Color.Success" Title="إضافة عميل جديد"
+                                   OnClick="AddNewCustomer" />
+                }
+            </div>
+
+            @if (selectedCustomer != null)
+            {
+                <MudPaper Class="pa-1 mb-1" Style="background: #ecfdf5;">
+                    <MudText Typo="Typo.caption">
+                        العميل: <strong>@selectedCustomer.FullName</strong>
+                        @if (!string.IsNullOrEmpty(selectedCustomer.Phone))
+                        {
+                            <span> | @selectedCustomer.Phone</span>
+                        }
+                    </MudText>
+                </MudPaper>
+            }
+
+            <!-- محتوى السلة -->
+            <div style="flex: 1; overflow-y: auto;">
+                @if (cart.Count == 0)
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true">السلة فاضية</MudAlert>
+                }
+                else
+                {
+                    @foreach (var item in cart)
+                    {
+                        <div class="cart-item-row">
+                            <div style="flex: 1;">
+                                <MudText Typo="Typo.body2" Style="font-weight: bold;">@item.ProductName</MudText>
+                                <MudText Typo="Typo.caption">
+                                    @item.UnitPrice.ToString("N2") × @item.Quantity = 
+                                    <strong>@((item.UnitPrice * item.Quantity).ToString("N2"))</strong>
+                                </MudText>
+                            </div>
+                            <div class="d-flex align-center">
+                                <MudIconButton Icon="@Icons.Material.Filled.Remove" Size="Size.Small"
+                                               OnClick="() => DecrementItem(item)" />
+                                <MudText Class="mx-1">@item.Quantity</MudText>
+                                <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small"
+                                               OnClick="() => IncrementItem(item)" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                               OnClick="() => RemoveItem(item)" />
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+
+            <MudDivider Class="my-1" />
+
+            <!-- الإجماليات -->
+            <div>
+                <!-- عدد القطع -->
+                <div class="d-flex justify-space-between">
+                    <MudText Typo="Typo.body2">عدد القطع:</MudText>
+                    <MudText Typo="Typo.body2"><strong>@TotalItems قطعة</strong></MudText>
+                </div>
+
+                <!-- الإجمالي -->
+                <div class="d-flex justify-space-between">
+                    <MudText Typo="Typo.body2">الإجمالي:</MudText>
+                    <MudText Typo="Typo.body2">@SubTotal.ToString("N2") ج</MudText>
+                </div>
+
+                <!-- الخصم -->
+                <div class="d-flex justify-space-between align-center">
+                    <MudText Typo="Typo.body2">الخصم:</MudText>
+                    <MudNumericField @bind-Value="discount" Min="0" Variant="Variant.Outlined" 
+                                     Margin="Margin.Dense" Style="width: 100px;" Format="N2" />
+                </div>
+
+                <!-- الضريبة (لو متفعلة) -->
+                @if (settings.ShowTaxInPOS)
+                {
+                    <div class="d-flex justify-space-between">
+                        <MudText Typo="Typo.body2">الضريبة (14%):</MudText>
+                        <MudText Typo="Typo.body2">@TaxAmount.ToString("N2") ج</MudText>
+                    </div>
+                }
+
+                <!-- الربحية (للأدمن فقط) -->
+                @if (settings.ShowProfitInPOS && (Session.Role == "Owner" || Session.Role == "BrandAdmin"))
+                {
+                    <div class="d-flex justify-space-between" style="background: #fef3c7; padding: 4px;">
+                        <MudText Typo="Typo.caption">الربح المتوقع:</MudText>
+                        <MudText Typo="Typo.caption" Style="font-weight: bold;">@ExpectedProfit.ToString("N2") ج</MudText>
+                    </div>
+                }
+
+                <MudDivider />
+
+                <!-- المطلوب الكلي -->
+                <div class="d-flex justify-space-between align-center mt-1">
+                    <MudText Typo="Typo.h6">المطلوب:</MudText>
+                    <MudText Typo="Typo.h5" Color="Color.Primary"><strong>@GrandTotal.ToString("N2") ج</strong></MudText>
+                </div>
+
+                <!-- أزرار الإجراءات -->
+                <MudGrid Spacing="1" Class="mt-1">
+                    <MudItem xs="12">
+                        <MudButton Variant="Variant.Filled" Color="Color.Success" 
+                                   FullWidth="true" Size="Size.Large"
+                                   StartIcon="@Icons.Material.Filled.PointOfSale"
+                                   Disabled="@(cart.Count == 0 || isProcessing)"
+                                   OnClick="CompleteSale">
+                            @if (isProcessing) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> }
+                            else { <MudText>بيع (F4)</MudText> }
+                        </MudButton>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudButton Variant="Variant.Outlined" FullWidth="true"
+                                   StartIcon="@Icons.Material.Filled.Pause"
+                                   OnClick="HoldSale" Disabled="@(cart.Count == 0)">
+                            تعليق
+                        </MudButton>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Error" FullWidth="true"
+                                   StartIcon="@Icons.Material.Filled.Clear"
+                                   OnClick="ClearCart">
+                            إلغاء
+                        </MudButton>
+                    </MudItem>
+                </MudGrid>
+            </div>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private MudTextField<string>? barcodeField;
+    private List<ProductDto>? allProducts;
+    private List<ProductDto>? filteredProducts;
+    private List<CartItem> cart = new();
+    private string barcodeInput = string.Empty;
+    private decimal discount = 0;
+    private bool isProcessing = false;
+    private CustomerDto? selectedCustomer;
+    private BrandSettingsDto settings = new();
+
+    // لـ Zoom
+    private int productsCol = 7;
+    private int cartCol = 5;
+    private int cardSize = 3;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Session.IsAuthenticated)
+        {
+            settings = await SettingsService.GetSettingsAsync(Session.BrandId);
+            allProducts = await ProductService.GetProductsAsync(Session.BrandId);
+            filteredProducts = allProducts;
+        }
+    }
+
+    private void ZoomOut()
+    {
+        // كروت أصغر، صفوف أكتر
+        if (cardSize > 2) cardSize--;
+    }
+
+    private void ZoomIn()
+    {
+        if (cardSize < 6) cardSize++;
+    }
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (string.IsNullOrEmpty(barcodeInput))
+        {
+            filteredProducts = allProducts;
+            return;
+        }
+
+        if (e.Key == "Enter" && !string.IsNullOrEmpty(barcodeInput))
+        {
+            var product = await ProductService.GetByBarcodeAsync(barcodeInput, Session.BrandId);
+            if (product != null && product.Variants.Any())
+            {
+                AddToCart(product, product.Variants.First());
+                barcodeInput = string.Empty;
+                filteredProducts = allProducts;
+                return;
+            }
+        }
+
+        filteredProducts = allProducts?.Where(p =>
+            p.ProductName.Contains(barcodeInput, StringComparison.OrdinalIgnoreCase) ||
+            p.SKU.Contains(barcodeInput, StringComparison.OrdinalIgnoreCase) ||
+            (p.Barcode?.Contains(barcodeInput) ?? false) ||
+            p.Variants.Any(v => v.Barcode?.Contains(barcodeInput) ?? false)
+        ).ToList();
+    }
+
+    private async Task SelectCustomer()
+    {
+        var dialog = DialogService.Show<CustomerSelectDialog>("اختيار عميل");
+        var result = await dialog.Result;
+        if (!result.Canceled && result.Data is CustomerDto customer)
+        {
+            selectedCustomer = customer;
+        }
+    }
+
+    private async Task AddNewCustomer()
+    {
+        // إضافة عميل سريع من POS
+        var dialog = DialogService.Show<QuickCustomerDialog>("عميل جديد",
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled && result.Data is CustomerDto newCustomer)
+        {
+            selectedCustomer = newCustomer;
+            Snackbar.Add($"تم إضافة العميل {newCustomer.FullName}", Severity.Success);
+        }
+    }
+
+    private void ClearCustomer() => selectedCustomer = null;
+
+    private void AddToCart(ProductDto product, ProductVariantDto variant)
+    {
+        if (variant.TotalStock <= 0)
+        {
+            Snackbar.Add("المنتج رصيده صفر", Severity.Warning);
+            return;
+        }
+
+        var existing = cart.FirstOrDefault(c => c.VariantId == variant.VariantId);
+        if (existing != null)
+        {
+            if (existing.Quantity >= variant.TotalStock)
+            {
+                Snackbar.Add("لا يوجد مخزون كافي", Severity.Warning);
+                return;
+            }
+            existing.Quantity++;
+        }
+        else
+        {
+            cart.Add(new CartItem
+            {
+                VariantId = variant.VariantId,
+                ProductName = variant.VariantName ?? product.ProductName,
+                UnitPrice = variant.SellingPrice ?? product.BaseSellingPrice,
+                UnitCost = variant.CostPrice ?? product.BaseCostPrice,
+                Quantity = 1,
+                MaxStock = variant.TotalStock
+            });
+        }
+    }
+
+    private void IncrementItem(CartItem item)
+    {
+        if (item.Quantity < item.MaxStock) item.Quantity++;
+        else Snackbar.Add("لا يوجد مخزون كافي", Severity.Warning);
+    }
+
+    private void DecrementItem(CartItem item) { if (item.Quantity > 1) item.Quantity--; }
+    private void RemoveItem(CartItem item) => cart.Remove(item);
+    private void ClearCart() { cart.Clear(); discount = 0; selectedCustomer = null; }
+
+    private decimal TotalItems => cart.Sum(c => c.Quantity);
+    private decimal SubTotal => cart.Sum(c => c.UnitPrice * c.Quantity);
+    private decimal TaxAmount => settings.ShowTaxInPOS ? SubTotal * 0.14m : 0;
+    private decimal GrandTotal => SubTotal + TaxAmount - discount;
+    private decimal ExpectedProfit => cart.Sum(c => (c.UnitPrice - c.UnitCost) * c.Quantity) - discount;
+
+    private async Task CompleteSale()
+    {
+        if (cart.Count == 0) return;
+
+        isProcessing = true;
+        try
+        {
+            var request = new CreateSaleRequest
+            {
+                BranchId = Session.CurrentBranchId,
+                CustomerId = selectedCustomer?.CustomerId,
+                DiscountAmount = discount,
+                Items = cart.Select(c => new SaleItemRequest
+                {
+                    VariantId = c.VariantId,
+                    Quantity = c.Quantity,
+                    UnitPrice = c.UnitPrice
+                }).ToList(),
+                Payments = new List<SalePaymentRequest>
+                {
+                    new() { PaymentMethod = "Cash", Amount = GrandTotal }
+                }
+            };
+
+            var result = await SalesService.CreateSaleAsync(Session.BrandId, Session.UserId, request);
+            Snackbar.Add($"✅ تم البيع - فاتورة {result.InvoiceNumber}", Severity.Success);
+            
+            // طباعة الفاتورة تلقائياً
+            lastInvoiceId = result.InvoiceId;
+            await PrintLastReceipt();
+            
+            ClearCart();
+            allProducts = await ProductService.GetProductsAsync(Session.BrandId);
+            filteredProducts = allProducts;
+            
+            // ركز على حقل الباركود مرة تانية
+            if (barcodeField != null) await barcodeField.FocusAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطأ: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private int lastInvoiceId = 0;
+    [Inject] IJSRuntime JS { get; set; } = null!;
+
+    private async Task PrintLastReceipt()
+    {
+        if (lastInvoiceId == 0) return;
+        // فتح صفحة الطباعة في tab جديد - هيستخدم نفس الـ Session
+        await JS.InvokeVoidAsync("open", $"/print-receipt/{lastInvoiceId}", "_blank");
+    }
+
+    private void HoldSale()
+    {
+        Snackbar.Add("تم تعليق البيع", Severity.Info);
+        ClearCart();
+    }
+
+    public class CartItem
+    {
+        public int VariantId { get; set; }
+        public string ProductName { get; set; } = string.Empty;
+        public decimal UnitPrice { get; set; }
+        public decimal UnitCost { get; set; }
+        public decimal Quantity { get; set; }
+        public decimal MaxStock { get; set; }
+    }
+}

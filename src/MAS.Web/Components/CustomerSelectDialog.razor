@@ -1,0 +1,52 @@
+@inject ICustomerService CustomerService
+@inject UserSession Session
+
+<MudDialog>
+    <DialogContent>
+        <MudTextField @bind-Value="searchPhone" Label="بحث برقم الهاتف أو الاسم" 
+                      Variant="Variant.Outlined" Immediate="true" Class="mb-3" 
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" />
+        @if (customers == null)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else
+        {
+            <MudList Clickable="true" Dense="true" Style="max-height: 400px; overflow-y: auto;">
+                @foreach (var customer in FilteredCustomers.Take(20))
+                {
+                    <MudListItem OnClick="() => SelectCustomer(customer)">
+                        <div>
+                            <MudText Typo="Typo.body1" Style="font-weight: bold;">@customer.FullName</MudText>
+                            <MudText Typo="Typo.caption">@customer.Phone | @customer.CustomerType</MudText>
+                        </div>
+                    </MudListItem>
+                }
+            </MudList>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">إلغاء</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    private List<CustomerDto>? customers;
+    private string searchPhone = string.Empty;
+
+    private List<CustomerDto> FilteredCustomers =>
+        customers?.Where(c =>
+            string.IsNullOrEmpty(searchPhone) ||
+            c.FullName.Contains(searchPhone, StringComparison.OrdinalIgnoreCase) ||
+            (c.Phone?.Contains(searchPhone) ?? false)
+        ).ToList() ?? new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        customers = await CustomerService.GetCustomersAsync(Session.BrandId);
+    }
+
+    private void SelectCustomer(CustomerDto customer) => MudDialog.Close(DialogResult.Ok(customer));
+    private void Cancel() => MudDialog.Cancel();
+}

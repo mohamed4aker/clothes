@@ -1,0 +1,101 @@
+@page "/settings"
+@inject IBrandSettingsService SettingsService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+
+<PageTitle>الإعدادات - MAS</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">⚙️ الإعدادات</MudText>
+
+@if (settings == null) { <MudProgressLinear Indeterminate="true" /> }
+else
+{
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-3">🛒 إعدادات نقطة البيع</MudText>
+                <MudSwitch T="bool" @bind-Value="settings.ShowTaxInPOS" Label="إظهار الضريبة في POS" Color="Color.Primary" />
+                <MudSwitch T="bool" @bind-Value="settings.ShowProfitInPOS" Label="إظهار الربحية للأدمن في POS" Color="Color.Primary" />
+                <MudSwitch T="bool" @bind-Value="settings.ShowProductImages" Label="إظهار صور المنتجات في POS" Color="Color.Primary" />
+                <MudSwitch T="bool" @bind-Value="settings.HideZeroStockProducts" Label="إخفاء المنتجات اللي رصيدها صفر من POS" Color="Color.Primary" />
+
+                <MudDivider Class="my-4" />
+
+                <MudText Typo="Typo.h6" Class="mb-3">🧾 إعدادات الفاتورة</MudText>
+                <MudTextField @bind-Value="settings.ReceiptHeader" Label="رأس الفاتورة" Variant="Variant.Outlined" Lines="2" Class="mb-2" />
+                <MudTextField @bind-Value="settings.ReceiptFooter" Label="ذيل الفاتورة" Variant="Variant.Outlined" Lines="2" Class="mb-2" />
+
+                <MudDivider Class="my-4" />
+
+                <MudText Typo="Typo.h6" Class="mb-3">🎨 المظهر</MudText>
+                <MudGrid>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="settings.PrimaryColor" Label="اللون الأساسي" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudButton Variant="Variant.Outlined" OnClick="@(() => settings.PrimaryColor = "#0d9488")" Style="background: #0d9488; color: white;">أخضر</MudButton>
+                        <MudButton Variant="Variant.Outlined" OnClick="@(() => settings.PrimaryColor = "#92400e")" Style="background: #92400e; color: white;">بني</MudButton>
+                        <MudButton Variant="Variant.Outlined" OnClick="@(() => settings.PrimaryColor = "#1e40af")" Style="background: #1e40af; color: white;">أزرق</MudButton>
+                    </MudItem>
+                </MudGrid>
+
+                <MudDivider Class="my-4" />
+
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" Size="Size.Large" OnClick="Save" Disabled="@isSaving">
+                    @if (isSaving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> }
+                    else { <MudText>حفظ الإعدادات</MudText> }
+                </MudButton>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-3">معلومات</MudText>
+                <MudList T="string" Dense="true">
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.Person">
+                        <MudText Typo="Typo.subtitle2">المستخدم: @Session.FullName</MudText>
+                    </MudListItem>
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.Business">
+                        <MudText Typo="Typo.subtitle2">البراند: @Session.BrandName</MudText>
+                    </MudListItem>
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.Badge">
+                        <MudText Typo="Typo.subtitle2">الدور: @TranslateRole(Session.Role)</MudText>
+                    </MudListItem>
+                </MudList>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private BrandSettingsDto? settings;
+    private bool isSaving = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Session.IsAuthenticated)
+            settings = await SettingsService.GetSettingsAsync(Session.BrandId);
+    }
+
+    private async Task Save()
+    {
+        if (settings == null) return;
+        isSaving = true;
+        try
+        {
+            await SettingsService.UpdateSettingsAsync(Session.BrandId, settings);
+            Snackbar.Add("تم حفظ الإعدادات", Severity.Success);
+        }
+        catch (Exception ex) { Snackbar.Add($"خطأ: {ex.Message}", Severity.Error); }
+        finally { isSaving = false; }
+    }
+
+    private string TranslateRole(string role) => role switch
+    {
+        "Owner" => "مالك",
+        "BrandAdmin" => "مدير براند",
+        "BranchManager" => "مدير فرع",
+        "Cashier" => "كاشير",
+        _ => role
+    };
+}

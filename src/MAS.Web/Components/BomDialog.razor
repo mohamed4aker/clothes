@@ -1,0 +1,238 @@
+@inject IManufacturingService ManufacturingService
+@inject IProductService ProductService
+@inject IUnitService UnitService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.BomName" Label="اسم الوصفة *" Variant="Variant.Outlined" Required="true" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudSelect T="int" @bind-Value="model.ProductId" Label="المنتج النهائي *" Variant="Variant.Outlined" Required="true">
+                    @if (products != null)
+                    {
+                        @foreach (var p in products)
+                        {
+                            <MudSelectItem T="int" Value="p.ProductId">@p.ProductName (@p.SKU)</MudSelectItem>
+                        }
+                    }
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudText Typo="Typo.h6" Class="mt-2">📦 الخامات (المكونات)</MudText>
+                <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.Add" Color="Color.Primary" OnClick="AddItem">
+                    إضافة خامة
+                </MudButton>
+            </MudItem>
+
+            @for (int i = 0; i < items.Count; i++)
+            {
+                var idx = i;
+                <MudItem xs="12">
+                    <MudPaper Class="pa-2">
+                        <MudGrid>
+                            <MudItem xs="12" md="4">
+                                <MudSelect T="int" @bind-Value="items[idx].RawMaterialVariantId" Label="الخامة *" Variant="Variant.Outlined" Required="true">
+                                    @if (products != null)
+                                    {
+                                        @foreach (var p in products)
+                                        {
+                                            @foreach (var v in p.Variants)
+                                            {
+                                                <MudSelectItem T="int" Value="v.VariantId">@(v.VariantName ?? p.ProductName)</MudSelectItem>
+                                            }
+                                        }
+                                    }
+                                </MudSelect>
+                            </MudItem>
+                            <MudItem xs="6" md="2">
+                                <MudNumericField @bind-Value="items[idx].Quantity" Label="الكمية" Variant="Variant.Outlined" Min="0" Format="N3" />
+                            </MudItem>
+                            <MudItem xs="6" md="2">
+                                <MudSelect T="int?" @bind-Value="items[idx].UnitId" Label="الوحدة" Variant="Variant.Outlined">
+                                    <MudSelectItem T="int?" Value="null">-</MudSelectItem>
+                                    @if (units != null)
+                                    {
+                                        @foreach (var u in units)
+                                        {
+                                            <MudSelectItem T="int?" Value="u.UnitId">@u.UnitName</MudSelectItem>
+                                        }
+                                    }
+                                </MudSelect>
+                            </MudItem>
+                            <MudItem xs="8" md="3">
+                                <MudNumericField @bind-Value="items[idx].UnitCost" Label="سعر الوحدة" Variant="Variant.Outlined" Min="0" Format="N2" />
+                            </MudItem>
+                            <MudItem xs="4" md="1">
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" 
+                                               OnClick="() => RemoveItem(idx)" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudPaper>
+                </MudItem>
+            }
+
+            <MudItem xs="12">
+                <MudText Typo="Typo.h6" Class="mt-3">💰 التكاليف الإضافية</MudText>
+            </MudItem>
+            <MudItem xs="6" md="3">
+                <MudNumericField @bind-Value="model.DirectLaborCost" Label="عمالة مباشرة" Variant="Variant.Outlined" Min="0" Format="N2" />
+            </MudItem>
+            <MudItem xs="6" md="3">
+                <MudNumericField @bind-Value="model.OverheadCost" Label="كهربا/إيجار/معدات" Variant="Variant.Outlined" Min="0" Format="N2" />
+            </MudItem>
+            <MudItem xs="6" md="3">
+                <MudNumericField @bind-Value="model.AdminExpenses" Label="مصاريف إدارية" Variant="Variant.Outlined" Min="0" Format="N2" />
+            </MudItem>
+            <MudItem xs="6" md="3">
+                <MudNumericField @bind-Value="model.OtherCosts" Label="مصاريف أخرى" Variant="Variant.Outlined" Min="0" Format="N2" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.OtherCostsDescription" Label="وصف المصاريف الأخرى" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="6" md="3">
+                <MudNumericField @bind-Value="model.ExpectedWastePercent" Label="نسبة الهالك %" Variant="Variant.Outlined" Min="0" Max="100" />
+            </MudItem>
+            <MudItem xs="6" md="3">
+                <MudNumericField @bind-Value="model.TargetMarginPercent" Label="هامش الربح %" Variant="Variant.Outlined" Min="0" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudNumericField @bind-Value="model.OutputQuantity" Label="عدد الوحدات الناتجة من الوصفة" Variant="Variant.Outlined" Min="1" />
+                <MudText Typo="Typo.caption">مثلاً: لو الوصفة لـ 1 قميص، اكتب 1. لو لـ 10 قميص، اكتب 10.</MudText>
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="model.Notes" Label="ملاحظات" Variant="Variant.Outlined" Lines="2" />
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudPaper Class="pa-3" Style="background: #f0fdfa;">
+                    <MudGrid>
+                        <MudItem xs="6" md="3">
+                            <MudText Typo="Typo.subtitle2">تكلفة الخامات:</MudText>
+                            <MudText Typo="Typo.h6">@CalculateMaterialsCost().ToString("N2") ج</MudText>
+                        </MudItem>
+                        <MudItem xs="6" md="3">
+                            <MudText Typo="Typo.subtitle2">التكلفة الكلية للوحدة:</MudText>
+                            <MudText Typo="Typo.h6" Color="Color.Primary">@CalculateUnitCost().ToString("N2") ج</MudText>
+                        </MudItem>
+                        <MudItem xs="6" md="3">
+                            <MudText Typo="Typo.subtitle2">السعر المقترح:</MudText>
+                            <MudText Typo="Typo.h6" Color="Color.Success">@CalculateSuggestedPrice().ToString("N2") ج</MudText>
+                        </MudItem>
+                        <MudItem xs="6" md="3">
+                            <MudText Typo="Typo.subtitle2">الربح المتوقع/وحدة:</MudText>
+                            <MudText Typo="Typo.h6" Color="Color.Warning">@(CalculateSuggestedPrice() - CalculateUnitCost()).ToString("N2") ج</MudText>
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">إلغاء</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@isSaving">
+            @if (isSaving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> }
+            else { <MudText>حفظ</MudText> }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public BomDto? Bom { get; set; }
+
+    private CreateBomRequest model = new() { TargetMarginPercent = 30, OutputQuantity = 1 };
+    private List<ProductDto>? products;
+    private List<UnitDto>? units;
+    private List<BomItemRequest> items = new();
+    private bool isSaving = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        products = await ProductService.GetProductsAsync(Session.BrandId);
+        units = await UnitService.GetUnitsAsync(Session.BrandId);
+
+        if (Bom != null)
+        {
+            model = new CreateBomRequest
+            {
+                ProductId = Bom.ProductId,
+                BomName = Bom.BomName,
+                DirectLaborCost = Bom.DirectLaborCost,
+                OverheadCost = Bom.OverheadCost,
+                AdminExpenses = Bom.AdminExpenses,
+                OtherCosts = Bom.OtherCosts,
+                OtherCostsDescription = Bom.OtherCostsDescription,
+                ExpectedWastePercent = Bom.ExpectedWastePercent,
+                TargetMarginPercent = Bom.TargetMarginPercent,
+                OutputQuantity = Bom.OutputQuantity,
+                Notes = Bom.Notes
+            };
+            items = Bom.Items.Select(i => new BomItemRequest
+            {
+                RawMaterialVariantId = i.RawMaterialVariantId,
+                Quantity = i.Quantity,
+                UnitId = i.UnitId,
+                UnitCost = i.UnitCost,
+                Notes = i.Notes
+            }).ToList();
+        }
+    }
+
+    private void AddItem() => items.Add(new BomItemRequest());
+    private void RemoveItem(int idx) => items.RemoveAt(idx);
+
+    private decimal CalculateMaterialsCost() => items.Sum(i => i.Quantity * i.UnitCost);
+
+    private decimal CalculateUnitCost()
+    {
+        var matCost = CalculateMaterialsCost();
+        var waste = matCost * (model.ExpectedWastePercent / 100);
+        var total = matCost + waste + model.DirectLaborCost + model.OverheadCost + model.AdminExpenses + model.OtherCosts;
+        return model.OutputQuantity > 0 ? total / model.OutputQuantity : total;
+    }
+
+    private decimal CalculateSuggestedPrice() => CalculateUnitCost() * (1 + model.TargetMarginPercent / 100);
+
+    private async Task Submit()
+    {
+        if (string.IsNullOrWhiteSpace(model.BomName) || model.ProductId == 0)
+        {
+            Snackbar.Add("ادخل اسم الوصفة والمنتج", Severity.Warning);
+            return;
+        }
+
+        if (!items.Any())
+        {
+            Snackbar.Add("ضيف خامة واحدة على الأقل", Severity.Warning);
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            model.Items = items;
+            if (Bom == null)
+                await ManufacturingService.CreateBomAsync(Session.BrandId, Session.UserId, model);
+            else
+                await ManufacturingService.UpdateBomAsync(Bom.BomId, Session.BrandId, model);
+
+            Snackbar.Add("تم الحفظ", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطأ: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

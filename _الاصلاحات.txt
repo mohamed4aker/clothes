@@ -1,0 +1,49 @@
+الإصلاحات (تراكمي):
+
+[1] Connection String -> Server=AHMED-MEHANNA\SQLEXPRESS  (MAS.Web + MAS.API)
+[2] 00_install_master.sql -> AS [RowCount]
+[3] AppDbContext: الـ 6 enums من HasConversion<int>() إلى HasConversion<string>()
+    (لأن الأعمدة NVARCHAR) + ملف database/99_reset_for_string_enums.sql
+
+[4] مشكلة "بيطلعني ويطلب لوجين لما أنتقل بين الصفحات":
+    السبب:
+      - حالة الدخول متخزّنة في UserSession (scoped في الذاكرة) فقط،
+        واللوجين مبيحفظش أي حاجة دايمة. أي reload أو سقوط للـ circuit
+        (الـ "بينج") بيمسح الجلسة -> يرجّعك للوجين.
+    الحل اللي اتعمل:
+      - Login.razor: بيحفظ بيانات الدخول في ProtectedSessionStorage (تخزين المتصفح).
+      - MainLayout.razor: لو الجلسة فاضية بيسترجعها تلقائيًا من التخزين (OnAfterRenderAsync)،
+        و Logout بقى بيمسحها.
+      - Program.cs: تفعيل DetailedErrors على الـ Blazor circuit عشان نشوف الخطأ الحقيقي.
+
+مهم:
+  الـ "بينج" نفسه معناه إن الـ circuit بيقع بسبب EXCEPTION في صفحة معينة (غالبًا POS).
+  الإصلاح فوق بيمنع إنك تتطلّع برّه، بس عشان نظبط الخطأ من جذره:
+   - شغّل المشروع من الـ terminal (dotnet run) وافتح الصفحة اللي بتقع،
+     وهتلاقي رسالة الـ exception في الـ terminal (أو في المتصفح دلوقتي بعد DetailedErrors).
+   - ابعت نص الـ exception وأنا أظبطه.
+
+الدخول: admin / admin
+
+[5] تجهيز الإنتاج + إصلاح "الشاشة التانية بتعلق" (نسخة mas-4-3):
+    أ) MainLayout.razor: إضافة ErrorBoundary حوالين محتوى الصفحات.
+       أي خطأ في صفحة بقى محصور فيها (رسالة + زر إعادة محاولة)
+       بدل ما يموّت الـ circuit كله ويجمّد الموقع.
+       + التعافي تلقائي عند التنقل لأي صفحة تانية.
+    ب) _Host.cshtml: إعادة اتصال تلقائية (8 محاولات كل 1.5 ثانية)،
+       ولو فشلت بيعمل reload تلقائي — ومع حفظ الجلسة بترجع مسجل دخول.
+    ج) Login.razor: شيل عرض بيانات admin/admin من شاشة الدخول.
+    د) Program.cs: البورتات الثابتة (5002/7000) بقت للتطوير فقط
+       عشان الاستضافة (IIS / Kestrel / ASPNETCORE_URLS) تشتغل صح.
+    هـ) تسجيل الأخطاء في ملف: logs/errors.log جنب ملفات التطبيق
+       (FileLoggerProvider جديد) — لو حصلت أي مشكلة على السيرفر
+       افتح الملف ده وابعت المحتوى.
+    و) appsettings.Production.json جديد — حط فيه الـ Connection String
+       بتاع سيرفر الإنتاج قبل الرفع.
+
+تنبيهات أمان قبل الرفع على النت (مهم):
+  - الباسوردات متخزنة Plain Text في الداتابيز (اتشالت BCrypt بطلبك قبل كده).
+    على النت ده خطر حقيقي — لو هترفع لعميل فعلي رجّع التشفير.
+  - صفحة "تصفير البيانات" (/reset-data) ظاهرة في القائمة —
+    فكّر تشيلها أو تخليها للـ Owner بس قبل التسليم.
+  - غيّر باسورد admin فوراً بعد أول دخول على السيرفر.

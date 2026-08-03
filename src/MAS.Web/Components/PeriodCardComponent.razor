@@ -1,0 +1,62 @@
+<MudGrid>
+    <MudItem xs="12" md="3">
+        <MudPaper Class="pa-3" Style="background: #ecfdf5; text-align: center;">
+            <MudText Typo="Typo.subtitle2">المبيعات</MudText>
+            <MudText Typo="Typo.h5" Color="Color.Success">@Stats.TotalSales.ToString("N2") ج</MudText>
+            <MudText Typo="Typo.caption">@Stats.InvoicesCount فاتورة</MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" md="3">
+        <MudPaper Class="pa-3" Style="background: #fef3c7; text-align: center;">
+            <MudText Typo="Typo.subtitle2">المشتريات</MudText>
+            <MudText Typo="Typo.h5">@Stats.TotalPurchases.ToString("N2") ج</MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" md="3">
+        <MudPaper Class="pa-3" Style="background: #fee2e2; text-align: center;">
+            <MudText Typo="Typo.subtitle2">المصاريف</MudText>
+            <MudText Typo="Typo.h5" Color="Color.Error">@Stats.TotalExpenses.ToString("N2") ج</MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" md="3">
+        <MudPaper Class="pa-3" Style="background: #dbeafe; text-align: center;">
+            <MudText Typo="Typo.subtitle2">تكلفة البضاعة المباعة</MudText>
+            <MudText Typo="Typo.h5">@Stats.CostOfGoodsSold.ToString("N2") ج</MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" md="4">
+        <MudPaper Class="pa-3" Style="background: #f0fdfa; border: 2px solid #92400e; text-align: center;">
+            <MudText Typo="Typo.subtitle2">الربح الإجمالي</MudText>
+            <MudText Typo="Typo.h4" Color="Color.Primary">@Stats.GrossProfit.ToString("N2") ج</MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" md="4">
+        <MudPaper Class="pa-3" Style="@netProfitStyle">
+            <MudText Typo="Typo.subtitle2">صافي الربح</MudText>
+            <MudText Typo="Typo.h4" Color="@(Stats.NetProfit >= 0 ? Color.Success : Color.Error)">@Stats.NetProfit.ToString("N2") ج</MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" md="4">
+        <MudPaper Class="pa-3" Style="background: #fef3c7; text-align: center;">
+            <MudText Typo="Typo.subtitle2">متوسط الربح/فاتورة</MudText>
+            <MudText Typo="Typo.h5">@Stats.AverageProfitPerSale.ToString("N2") ج</MudText>
+            @if (Stats.ExpensesCovered)
+            {
+                <MudChip T="string" Color="Color.Success" Size="Size.Small">✓ المصاريف مغطاة</MudChip>
+            }
+            else
+            {
+                <MudChip T="string" Color="Color.Warning" Size="Size.Small">⚠ غير مغطاة</MudChip>
+            }
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    [Parameter] public PeriodStatsDto Stats { get; set; } = new();
+
+    private string netProfitStyle =>
+        Stats.NetProfit >= 0
+            ? "background: #ecfdf5; border: 2px solid #10b981; text-align: center;"
+            : "background: #fee2e2; border: 2px solid #ef4444; text-align: center;";
+}

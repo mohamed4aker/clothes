@@ -1,0 +1,130 @@
+@page "/cashier-sessions"
+@inject ICashierSessionService SessionService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>جلسات الكاشير - MAS</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12" Class="d-flex justify-space-between align-center">
+        <MudText Typo="Typo.h4">💰 جلسات الكاشير (تسليم درج)</MudText>
+        <div>
+            @if (activeSession == null)
+            {
+                <MudButton Color="Color.Success" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.LockOpen" OnClick="OpenSession">
+                    فتح جلسة (تسلم درج)
+                </MudButton>
+            }
+            else
+            {
+                <MudButton Color="Color.Error" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Lock" OnClick="CloseSession">
+                    قفل الجلسة
+                </MudButton>
+            }
+        </div>
+    </MudItem>
+</MudGrid>
+
+@if (activeSession != null)
+{
+    <MudPaper Class="pa-4 mt-3" Style="background: #ecfdf5;">
+        <MudText Typo="Typo.h6">🟢 جلسة مفتوحة دلوقتي</MudText>
+        <MudGrid Class="mt-2">
+            <MudItem xs="12" md="3">
+                <MudText Typo="Typo.subtitle2">بداية الجلسة:</MudText>
+                <MudText>@activeSession.OpenedAt.ToString("yyyy/MM/dd HH:mm")</MudText>
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudText Typo="Typo.subtitle2">رصيد الافتتاح:</MudText>
+                <MudText>@activeSession.OpeningBalance.ToString("N2") ج</MudText>
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudText Typo="Typo.subtitle2">المبيعات:</MudText>
+                <MudText>@activeSession.TotalSales.ToString("N2") ج</MudText>
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudText Typo="Typo.subtitle2">الكاش:</MudText>
+                <MudText>@activeSession.TotalCash.ToString("N2") ج</MudText>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+}
+
+<MudPaper Class="pa-4 mt-3">
+    <MudText Typo="Typo.h6" Class="mb-3">📜 الجلسات السابقة</MudText>
+    @if (sessions == null) { <MudProgressLinear Indeterminate="true" /> }
+    else if (!sessions.Any()) { <MudAlert Severity="Severity.Info">لا يوجد جلسات سابقة.</MudAlert> }
+    else
+    {
+        <MudTable Items="@sessions" Hover="true" Bordered="true" Dense="true">
+            <HeaderContent>
+                <MudTh>رقم الجلسة</MudTh>
+                <MudTh>الكاشير</MudTh>
+                <MudTh>الفرع</MudTh>
+                <MudTh>الفتح</MudTh>
+                <MudTh>القفل</MudTh>
+                <MudTh>افتتاحي</MudTh>
+                <MudTh>المبيعات</MudTh>
+                <MudTh>المتوقع</MudTh>
+                <MudTh>الفعلي</MudTh>
+                <MudTh>الفرق</MudTh>
+                <MudTh>الحالة</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.SessionNumber</MudTd>
+                <MudTd>@context.UserName</MudTd>
+                <MudTd>@context.BranchName</MudTd>
+                <MudTd>@context.OpenedAt.ToString("MM/dd HH:mm")</MudTd>
+                <MudTd>@(context.ClosedAt?.ToString("MM/dd HH:mm") ?? "-")</MudTd>
+                <MudTd>@context.OpeningBalance.ToString("N2")</MudTd>
+                <MudTd>@context.TotalSales.ToString("N2")</MudTd>
+                <MudTd>@(context.ExpectedBalance?.ToString("N2") ?? "-")</MudTd>
+                <MudTd>@(context.ClosingBalance?.ToString("N2") ?? "-")</MudTd>
+                <MudTd>
+                    @if (context.Difference.HasValue)
+                    {
+                        <span style="color: @(context.Difference == 0 ? "green" : "red");">
+                            @context.Difference.Value.ToString("N2")
+                        </span>
+                    }
+                </MudTd>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small" Color="@(context.Status == "Active" ? Color.Success : Color.Default)">
+                        @(context.Status == "Active" ? "مفتوحة" : "مقفولة")
+                    </MudChip>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private CashierSessionDto? activeSession;
+    private List<CashierSessionDto>? sessions;
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        if (!Session.IsAuthenticated) return;
+        activeSession = await SessionService.GetActiveSessionAsync(Session.UserId, Session.CurrentBranchId);
+        sessions = await SessionService.GetSessionsAsync(Session.BrandId);
+    }
+
+    private async Task OpenSession()
+    {
+        var dialog = DialogService.Show<OpenSessionDialog>("فتح جلسة جديدة", new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled) { Snackbar.Add("تم فتح الجلسة", Severity.Success); await LoadData(); }
+    }
+
+    private async Task CloseSession()
+    {
+        if (activeSession == null) return;
+        var parameters = new DialogParameters { ["SessionData"] = activeSession };
+        var dialog = DialogService.Show<CloseSessionDialog>("قفل الجلسة", parameters, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled) { Snackbar.Add("تم قفل الجلسة", Severity.Success); await LoadData(); }
+    }
+}

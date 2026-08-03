@@ -1,0 +1,104 @@
+@inject IManufacturingService ManufacturingService
+@inject IBranchService BranchService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.h6" Class="mb-3">🧮 حاسبة الإنتاج لـ: @ProductName</MudText>
+
+        <MudSelect T="int" @bind-Value="selectedBranchId" Label="الفرع/المخزن" Variant="Variant.Outlined" Class="mb-3">
+            @if (branches != null)
+            {
+                @foreach (var b in branches)
+                {
+                    <MudSelectItem T="int" Value="b.BranchId">@b.BranchName</MudSelectItem>
+                }
+            }
+        </MudSelect>
+
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Calculate"
+                   OnClick="Calculate" Disabled="@(selectedBranchId == 0 || isCalculating)" Class="mb-3">
+            احسب
+        </MudButton>
+
+        @if (result != null)
+        {
+            <MudPaper Class="pa-3 mb-3" Style="background: #f0fdfa;">
+                <MudText Typo="Typo.h5" Color="Color.Primary">
+                    🎯 أقصى عدد ممكن إنتاجه: <strong>@result.MaxPossibleUnits</strong> وحدة
+                </MudText>
+                @if (!string.IsNullOrEmpty(result.BottleneckMaterial) && result.MaxPossibleUnits > 0)
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Warning">
+                        ⚠️ نقطة الاختناق: <strong>@result.BottleneckMaterial</strong>
+                    </MudText>
+                }
+            </MudPaper>
+
+            <MudText Typo="Typo.subtitle1" Class="mb-2">📦 تفاصيل الخامات:</MudText>
+
+            <MudTable Items="@result.Materials" Dense="true" Bordered="true">
+                <HeaderContent>
+                    <MudTh>الخامة</MudTh>
+                    <MudTh>المطلوب/وحدة</MudTh>
+                    <MudTh>المتاح</MudTh>
+                    <MudTh>عدد الوحدات الممكنة</MudTh>
+                    <MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.MaterialName</MudTd>
+                    <MudTd>@context.RequiredPerUnit.ToString("N3")</MudTd>
+                    <MudTd>@context.AvailableStock.ToString("N3")</MudTd>
+                    <MudTd>@context.PossibleUnits</MudTd>
+                    <MudTd>
+                        @if (context.IsBottleneck)
+                        {
+                            <MudChip T="string" Color="Color.Warning" Size="Size.Small">نقطة اختناق</MudChip>
+                        }
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close">إغلاق</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int BomId { get; set; }
+    [Parameter] public string ProductName { get; set; } = string.Empty;
+
+    private List<BranchDto>? branches;
+    private int selectedBranchId = 0;
+    private bool isCalculating = false;
+    private ProductionCapacityResponse? result;
+
+    protected override async Task OnInitializedAsync()
+    {
+        branches = await BranchService.GetBranchesAsync(Session.BrandId);
+        if (branches.Any())
+            selectedBranchId = branches.First().BranchId;
+    }
+
+    private async Task Calculate()
+    {
+        isCalculating = true;
+        try
+        {
+            result = await ManufacturingService.CalculateCapacityAsync(BomId, selectedBranchId, Session.BrandId);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطأ: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isCalculating = false;
+        }
+    }
+
+    private void Close() => MudDialog.Close();
+}

@@ -1,0 +1,98 @@
+@inject IManufacturingService ManufacturingService
+@inject IBranchService BranchService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.h6" Class="mb-3">🏭 بدء إنتاج: @Bom.ProductName</MudText>
+
+        <MudGrid>
+            <MudItem xs="12">
+                <MudSelect T="int" @bind-Value="branchId" Label="الفرع *" Variant="Variant.Outlined" Required="true">
+                    @if (branches != null)
+                    {
+                        @foreach (var b in branches)
+                        {
+                            <MudSelectItem T="int" Value="b.BranchId">@b.BranchName</MudSelectItem>
+                        }
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12">
+                <MudNumericField @bind-Value="quantity" Label="الكمية المراد إنتاجها *" Variant="Variant.Outlined" Min="1" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="notes" Label="ملاحظات" Variant="Variant.Outlined" Lines="2" />
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudPaper Class="pa-3" Style="background: #fffbeb;">
+                    <MudText Typo="Typo.subtitle2">التكلفة المتوقعة:</MudText>
+                    <MudText Typo="Typo.body1">
+                        @((Bom.TotalCost * quantity).ToString("N2")) ج إجمالي
+                        (@Bom.TotalCost.ToString("N2") ج × @quantity وحدة)
+                    </MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">إلغاء</MudButton>
+        <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="Submit" Disabled="@isSaving">
+            @if (isSaving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> }
+            else { <MudText>بدء الإنتاج</MudText> }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public BomDto Bom { get; set; } = null!;
+
+    private List<BranchDto>? branches;
+    private int branchId = 0;
+    private decimal quantity = 1;
+    private string? notes;
+    private bool isSaving = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        branches = await BranchService.GetBranchesAsync(Session.BrandId);
+        if (branches.Any())
+            branchId = Session.CurrentBranchId > 0 ? Session.CurrentBranchId : branches.First().BranchId;
+    }
+
+    private async Task Submit()
+    {
+        if (branchId == 0 || quantity <= 0)
+        {
+            Snackbar.Add("ادخل البيانات الصحيحة", Severity.Warning);
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            await ManufacturingService.CreateProductionOrderAsync(Session.BrandId, Session.UserId, new CreateProductionOrderRequest
+            {
+                BomId = Bom.BomId,
+                BranchId = branchId,
+                PlannedQuantity = quantity,
+                Notes = notes
+            });
+            Snackbar.Add("تم إنشاء أمر الإنتاج", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطأ: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

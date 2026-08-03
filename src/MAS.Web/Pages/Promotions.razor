@@ -1,0 +1,108 @@
+@page "/promotions"
+@inject IPromotionService PromotionService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>العروض - MAS</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12" Class="d-flex justify-space-between align-center">
+        <MudText Typo="Typo.h4">🎁 العروض والكوبونات</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAdd">
+            إضافة عرض
+        </MudButton>
+    </MudItem>
+</MudGrid>
+
+<MudPaper Class="pa-4 mt-3">
+    @if (promotions == null) { <MudProgressLinear Indeterminate="true" /> }
+    else if (!promotions.Any()) { <MudAlert Severity="Severity.Info">لا يوجد عروض حالياً.</MudAlert> }
+    else
+    {
+        <MudTable Items="@promotions" Hover="true" Bordered="true">
+            <HeaderContent>
+                <MudTh>الاسم</MudTh>
+                <MudTh>الكوبون</MudTh>
+                <MudTh>نوع الخصم</MudTh>
+                <MudTh>القيمة</MudTh>
+                <MudTh>تاريخ البدء</MudTh>
+                <MudTh>تاريخ الانتهاء</MudTh>
+                <MudTh>الاستخدام</MudTh>
+                <MudTh>الحالة</MudTh>
+                <MudTh>الإجراءات</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Name</MudTd>
+                <MudTd>@(context.CouponCode ?? "-")</MudTd>
+                <MudTd>@(context.DiscountType == "Percentage" ? "نسبة %" : "مبلغ ثابت")</MudTd>
+                <MudTd>
+                    @if (context.DiscountType == "Percentage")
+                    {
+                        <text>@context.DiscountValue %</text>
+                    }
+                    else
+                    {
+                        <text>@context.DiscountValue.ToString("N2") ج</text>
+                    }
+                </MudTd>
+                <MudTd>@context.StartDate.ToString("yyyy/MM/dd")</MudTd>
+                <MudTd>@context.EndDate.ToString("yyyy/MM/dd")</MudTd>
+                <MudTd>@context.UsedCount@(context.UsageLimit.HasValue ? $" / {context.UsageLimit}" : "")</MudTd>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)">@context.Status</MudChip>
+                </MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => OpenEdit(context))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => Delete(context))" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private List<PromotionDto>? promotions;
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        if (Session.IsAuthenticated)
+            promotions = await PromotionService.GetPromotionsAsync(Session.BrandId);
+    }
+
+    private async Task OpenAdd()
+    {
+        var dialog = DialogService.Show<PromotionDialog>("إضافة عرض", new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadData();
+    }
+
+    private async Task OpenEdit(PromotionDto promo)
+    {
+        var parameters = new DialogParameters { ["Promotion"] = promo };
+        var dialog = DialogService.Show<PromotionDialog>("تعديل العرض", parameters, new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadData();
+    }
+
+    private async Task Delete(PromotionDto promo)
+    {
+        var confirm = await DialogService.ShowMessageBox("تأكيد", $"حذف العرض {promo.Name}؟", yesText: "حذف", cancelText: "إلغاء");
+        if (confirm == true)
+        {
+            await PromotionService.DeletePromotionAsync(promo.PromotionId, Session.BrandId);
+            Snackbar.Add("تم الحذف", Severity.Success);
+            await LoadData();
+        }
+    }
+
+    private Color GetStatusColor(string status) => status switch
+    {
+        "نشط" => Color.Success,
+        "منتهي" => Color.Error,
+        "لم يبدأ" => Color.Warning,
+        _ => Color.Default
+    };
+}

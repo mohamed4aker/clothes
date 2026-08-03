@@ -1,0 +1,18 @@
+@page "/raw-materials"
+@inject NavigationManager Nav
+
+<PageTitle>المواد الخام - MAS</PageTitle>
+
+<MudGrid Justify="Justify.Center">
+    <MudItem xs="12" md="8">
+        <MudPaper Class="pa-6">
+            <MudText Typo="Typo.h4" Class="mb-3">🧪 المواد الخام</MudText>
+            <MudAlert Severity="Severity.Info">
+                المواد الخام تُدار من صفحة "إضافة صنف" - اختار نوع المنتج "خامة (RawMaterial)".
+            </MudAlert>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-3" OnClick="@(() => Nav.NavigateTo("/products"))">
+                الذهاب لإدارة المنتجات
+            </MudButton>
+        </MudPaper>
+    </MudItem>
+</MudGrid>

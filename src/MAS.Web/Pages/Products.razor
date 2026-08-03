@@ -1,0 +1,111 @@
+@page "/products"
+@inject IProductService ProductService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>المنتجات - MAS</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12" Class="d-flex justify-space-between align-center">
+        <MudText Typo="Typo.h4">المنتجات</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" 
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenAddDialog">
+            إضافة منتج جديد
+        </MudButton>
+    </MudItem>
+</MudGrid>
+
+<MudPaper Class="pa-4 mt-3">
+    <MudTextField @bind-Value="searchText" Placeholder="بحث بالاسم أو الباركود..." 
+                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                  Immediate="true" Class="mb-3" />
+
+    @if (products == null)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else if (!FilteredProducts.Any())
+    {
+        <MudAlert Severity="Severity.Info">لا يوجد منتجات. اضغط "إضافة منتج" لإضافة منتج جديد.</MudAlert>
+    }
+    else
+    {
+        <MudTable Items="@FilteredProducts" Hover="true" Bordered="true">
+            <HeaderContent>
+                <MudTh>الكود</MudTh>
+                <MudTh>الباركود</MudTh>
+                <MudTh>الاسم</MudTh>
+                <MudTh>التصنيف</MudTh>
+                <MudTh>التكلفة</MudTh>
+                <MudTh>سعر البيع</MudTh>
+                <MudTh>المخزون</MudTh>
+                <MudTh>الإجراءات</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.SKU</MudTd>
+                <MudTd>@context.Barcode</MudTd>
+                <MudTd>@context.ProductName</MudTd>
+                <MudTd>@context.CategoryName</MudTd>
+                <MudTd>@context.BaseCostPrice.ToString("N2")</MudTd>
+                <MudTd>@context.BaseSellingPrice.ToString("N2")</MudTd>
+                <MudTd>@context.Variants.Sum(v => v.TotalStock).ToString("N0")</MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" 
+                                   OnClick="() => OpenEditDialog(context)" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                   OnClick="() => DeleteProduct(context)" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private List<ProductDto>? products;
+    private string searchText = string.Empty;
+
+    private List<ProductDto> FilteredProducts =>
+        products?.Where(p =>
+            string.IsNullOrEmpty(searchText) ||
+            p.ProductName.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+            (p.Barcode?.Contains(searchText) ?? false) ||
+            p.SKU.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+        ).ToList() ?? new();
+
+    protected override async Task OnInitializedAsync() => await LoadProducts();
+
+    private async Task LoadProducts()
+    {
+        if (Session.IsAuthenticated)
+            products = await ProductService.GetProductsAsync(Session.BrandId);
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var dialog = DialogService.Show<ProductDialog>("إضافة منتج جديد", new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadProducts();
+    }
+
+    private async Task OpenEditDialog(ProductDto product)
+    {
+        var parameters = new DialogParameters { ["Product"] = product };
+        var dialog = DialogService.Show<ProductDialog>("تعديل المنتج", parameters, new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadProducts();
+    }
+
+    private async Task DeleteProduct(ProductDto product)
+    {
+        var confirm = await DialogService.ShowMessageBox("تأكيد", $"حذف المنتج {product.ProductName}؟",
+            yesText: "حذف", cancelText: "إلغاء");
+        if (confirm == true)
+        {
+            await ProductService.DeleteProductAsync(product.ProductId, Session.BrandId);
+            Snackbar.Add("تم الحذف", Severity.Success);
+            await LoadProducts();
+        }
+    }
+}

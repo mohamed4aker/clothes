@@ -1,0 +1,101 @@
+@inject IWarehouseService WarehouseService
+@inject IBranchService BranchService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.WarehouseName" Label="اسم المخزن *" Variant="Variant.Outlined" Required="true" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.WarehouseCode" Label="كود المخزن *" Variant="Variant.Outlined" Required="true" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudSelect @bind-Value="model.WarehouseType" Label="نوع المخزن *" Variant="Variant.Outlined">
+                    <MudSelectItem Value="@("Finished")">📦 منتجات تامة</MudSelectItem>
+                    <MudSelectItem Value="@("RawMaterial")">🧪 خامات</MudSelectItem>
+                    <MudSelectItem Value="@("Mixed")">📋 مختلط (تامة + خامات)</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudSelect T="int?" @bind-Value="model.BranchId" Label="الفرع التابع" Variant="Variant.Outlined">
+                    <MudSelectItem T="int?" Value="null">- مستقل -</MudSelectItem>
+                    @if (branches != null)
+                    {
+                        @foreach (var b in branches)
+                        {
+                            <MudSelectItem T="int?" Value="b.BranchId">@b.BranchName</MudSelectItem>
+                        }
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.ManagerName" Label="المسؤول عن المخزن" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.Phone" Label="الهاتف" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="model.Address" Label="العنوان" Variant="Variant.Outlined" Lines="2" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudCheckBox T="bool" @bind-Value="model.IsMainWarehouse" Label="مخزن رئيسي" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">إلغاء</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">حفظ</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public WarehouseDto? Warehouse { get; set; }
+    private CreateWarehouseRequest model = new() { WarehouseType = "Finished" };
+    private List<BranchDto>? branches;
+
+    protected override async Task OnInitializedAsync()
+    {
+        branches = await BranchService.GetBranchesAsync(Session.BrandId);
+        if (Warehouse != null)
+        {
+            model = new CreateWarehouseRequest
+            {
+                BranchId = Warehouse.BranchId,
+                WarehouseName = Warehouse.WarehouseName,
+                WarehouseCode = Warehouse.WarehouseCode,
+                WarehouseType = Warehouse.WarehouseType,
+                Address = Warehouse.Address,
+                ManagerName = Warehouse.ManagerName,
+                Phone = Warehouse.Phone,
+                IsMainWarehouse = Warehouse.IsMainWarehouse
+            };
+        }
+    }
+
+    private async Task Submit()
+    {
+        if (string.IsNullOrWhiteSpace(model.WarehouseName) || string.IsNullOrWhiteSpace(model.WarehouseCode))
+        {
+            Snackbar.Add("ادخل اسم وكود المخزن", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            if (Warehouse == null)
+                await WarehouseService.CreateWarehouseAsync(Session.BrandId, model);
+            else
+                await WarehouseService.UpdateWarehouseAsync(Warehouse.WarehouseId, Session.BrandId, model);
+
+            Snackbar.Add("تم الحفظ", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { Snackbar.Add($"خطأ: {ex.Message}", Severity.Error); }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

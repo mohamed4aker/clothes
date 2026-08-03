@@ -1,0 +1,138 @@
+@inject IStockTakeService StockTakeService
+@inject IBranchService BranchService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        @if (items == null)
+        {
+            <MudGrid>
+                <MudItem xs="12" md="8">
+                    <MudSelect T="int" @bind-Value="branchId" Label="الفرع *" Variant="Variant.Outlined" Required="true">
+                        @if (branches != null)
+                        {
+                            @foreach (var b in branches) { <MudSelectItem T="int" Value="b.BranchId">@b.BranchName</MudSelectItem> }
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="LoadItems" Disabled="@(branchId == 0)">
+                        تحضير الأصناف للجرد
+                    </MudButton>
+                </MudItem>
+            </MudGrid>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Info" Class="mb-2">عدّل الكميات الفعلية اللي عددتها، النظام هيحسب الفرق تلقائياً</MudAlert>
+            <MudTextField @bind-Value="searchText" Placeholder="بحث..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Immediate="true" Class="mb-2" />
+
+            <div style="max-height: 400px; overflow-y: auto;">
+                <MudTable Items="@FilteredItems" Dense="true" Bordered="true">
+                    <HeaderContent>
+                        <MudTh>الصنف</MudTh>
+                        <MudTh>الكود</MudTh>
+                        <MudTh>الموجود في النظام</MudTh>
+                        <MudTh>العدد الفعلي</MudTh>
+                        <MudTh>الفرق</MudTh>
+                        <MudTh>قيمة الفرق</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.ProductName</MudTd>
+                        <MudTd>@context.SKU</MudTd>
+                        <MudTd>@context.SystemQuantity</MudTd>
+                        <MudTd>
+                            <MudNumericField @bind-Value="context.CountedQuantity" Min="0" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width:100px" />
+                        </MudTd>
+                        <MudTd>
+                            <span style="color: @((context.CountedQuantity - context.SystemQuantity) >= 0 ? "green" : "red");">
+                                @((context.CountedQuantity - context.SystemQuantity).ToString("N2"))
+                            </span>
+                        </MudTd>
+                        <MudTd>
+                            <span style="color: @(((context.CountedQuantity - context.SystemQuantity) * context.UnitCost) >= 0 ? "green" : "red");">
+                                @(((context.CountedQuantity - context.SystemQuantity) * context.UnitCost).ToString("N2"))
+                            </span>
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            </div>
+
+            <MudPaper Class="pa-3 mt-3" Style="background: #fef3c7;">
+                <MudGrid>
+                    <MudItem xs="6"><MudText>إجمالي الفرق:</MudText></MudItem>
+                    <MudItem xs="6">
+                        <MudText Align="Align.End"><strong style="color: @(TotalDifference >= 0 ? "green" : "red");">@TotalDifference.ToString("N2") ج</strong></MudText>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+
+            <MudTextField @bind-Value="notes" Label="ملاحظات" Variant="Variant.Outlined" Class="mt-2" Lines="2" />
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">إلغاء</MudButton>
+        @if (items != null)
+        {
+            <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="Submit" Disabled="@isSaving">
+                @if (isSaving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> }
+                else { <MudText>حفظ الجرد وتسوية المخزون</MudText> }
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    private List<BranchDto>? branches;
+    private List<StockTakeItemDto>? items;
+    private int branchId = 0;
+    private string searchText = string.Empty;
+    private string? notes;
+    private bool isSaving = false;
+
+    private List<StockTakeItemDto> FilteredItems =>
+        items?.Where(i => string.IsNullOrEmpty(searchText) ||
+            i.ProductName.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+            i.SKU.Contains(searchText, StringComparison.OrdinalIgnoreCase)).ToList() ?? new();
+
+    private decimal TotalDifference => items?.Sum(i => (i.CountedQuantity - i.SystemQuantity) * i.UnitCost) ?? 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        branches = await BranchService.GetBranchesAsync(Session.BrandId);
+        if (branches.Any()) branchId = Session.CurrentBranchId > 0 ? Session.CurrentBranchId : branches.First().BranchId;
+    }
+
+    private async Task LoadItems()
+    {
+        items = await StockTakeService.PrepareStockTakeAsync(branchId, Session.BrandId);
+    }
+
+    private async Task Submit()
+    {
+        if (items == null) return;
+        isSaving = true;
+        try
+        {
+            var request = new CreateStockTakeRequest
+            {
+                BranchId = branchId,
+                Notes = notes,
+                Items = items.Select(i => new StockTakeItemRequest
+                {
+                    VariantId = i.VariantId,
+                    CountedQuantity = i.CountedQuantity,
+                    Notes = i.Notes
+                }).ToList()
+            };
+            await StockTakeService.CreateStockTakeAsync(Session.BrandId, Session.UserId, request);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { Snackbar.Add($"خطأ: {ex.Message}", Severity.Error); }
+        finally { isSaving = false; }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

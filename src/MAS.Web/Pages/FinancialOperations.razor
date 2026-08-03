@@ -1,0 +1,151 @@
+@page "/financial-operations"
+@inject ISalesService SalesService
+@inject IPurchaseService PurchaseService
+@inject IExpenseService ExpenseService
+@inject UserSession Session
+
+<PageTitle>العمليات المالية - MAS</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">💸 العمليات المالية</MudText>
+
+<MudTabs Elevation="2" Rounded="true" PanelClass="pa-4">
+    <!-- التبويبة 1: السندات -->
+    <MudTabPanel Text="السندات" Icon="@Icons.Material.Filled.Receipt">
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-4" Style="background: #f0fdf4; cursor: pointer;">
+                    <MudIcon Icon="@Icons.Material.Filled.ArrowDownward" Color="Color.Success" Size="Size.Large" />
+                    <MudText Typo="Typo.h5" Color="Color.Success">📥 سند قبض</MudText>
+                    <MudText Typo="Typo.body2" Class="mt-2">
+                        تستخدم لاستلام مبالغ نقدية من عميل أو أي مصدر آخر (غير المبيعات العادية)
+                    </MudText>
+                    <MudText Typo="Typo.caption" Class="mt-2">أمثلة: تحصيل دين، استرداد إيداع، إيرادات أخرى</MudText>
+                    <MudButton Variant="Variant.Filled" Color="Color.Success" Class="mt-3" 
+                               StartIcon="@Icons.Material.Filled.Add" Disabled="true">
+                        قيد التطوير
+                    </MudButton>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-4" Style="background: #fef2f2; cursor: pointer;">
+                    <MudIcon Icon="@Icons.Material.Filled.ArrowUpward" Color="Color.Error" Size="Size.Large" />
+                    <MudText Typo="Typo.h5" Color="Color.Error">📤 سند صرف</MudText>
+                    <MudText Typo="Typo.body2" Class="mt-2">
+                        تستخدم لصرف مبالغ نقدية لجهة ما (غير المشتريات والمصاريف)
+                    </MudText>
+                    <MudText Typo="Typo.caption" Class="mt-2">أمثلة: سداد دين، دفع سلفة، تحويل لشريك</MudText>
+                    <MudButton Variant="Variant.Filled" Color="Color.Error" Class="mt-3" 
+                               StartIcon="@Icons.Material.Filled.Add" Disabled="true">
+                        قيد التطوير
+                    </MudButton>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        <MudAlert Severity="Severity.Info" Class="mt-3">
+            💡 العمليات الأساسية متاحة بالفعل:
+            <ul style="margin: 8px 0;">
+                <li><strong>المبيعات</strong> = سند قبض تلقائي (من POS أو فاتورة بيع)</li>
+                <li><strong>المشتريات</strong> = سند صرف تلقائي (لما تدفع للمورد)</li>
+                <li><strong>المصاريف</strong> = سند صرف تلقائي</li>
+            </ul>
+        </MudAlert>
+    </MudTabPanel>
+
+    <!-- التبويبة 2: الإيرادات -->
+    <MudTabPanel Text="الإيرادات" Icon="@Icons.Material.Filled.TrendingUp">
+        <MudGrid Class="mb-3">
+            <MudItem xs="12" md="6">
+                <MudDatePicker @bind-Date="fromDate" Label="من" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudDatePicker @bind-Date="toDate" Label="إلى" Variant="Variant.Outlined" />
+            </MudItem>
+        </MudGrid>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="LoadData" Class="mb-3">
+            تحديث
+        </MudButton>
+
+        @if (loading) { <MudProgressLinear Indeterminate="true" /> }
+        else
+        {
+            <MudGrid>
+                <MudItem xs="12" md="4">
+                    <MudPaper Class="pa-3 text-center" Style="background: #ecfdf5;">
+                        <MudText Typo="Typo.subtitle2">إجمالي المبيعات</MudText>
+                        <MudText Typo="Typo.h5" Color="Color.Success">@totalSales.ToString("N2") ج</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudPaper Class="pa-3 text-center" Style="background: #f0fdf4;">
+                        <MudText Typo="Typo.subtitle2">إجمالي الإيرادات</MudText>
+                        <MudText Typo="Typo.h5" Color="Color.Success">@totalSales.ToString("N2") ج</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudPaper Class="pa-3 text-center" Style="background: #dbeafe;">
+                        <MudText Typo="Typo.subtitle2">عدد الفواتير</MudText>
+                        <MudText Typo="Typo.h5">@invoicesCount</MudText>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        }
+    </MudTabPanel>
+
+    <!-- التبويبة 3: المصروفات -->
+    <MudTabPanel Text="المصروفات" Icon="@Icons.Material.Filled.TrendingDown">
+        @if (loading) { <MudProgressLinear Indeterminate="true" /> }
+        else
+        {
+            <MudGrid>
+                <MudItem xs="12" md="4">
+                    <MudPaper Class="pa-3 text-center" Style="background: #fef3c7;">
+                        <MudText Typo="Typo.subtitle2">المشتريات</MudText>
+                        <MudText Typo="Typo.h5" Color="Color.Warning">@totalPurchases.ToString("N2") ج</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudPaper Class="pa-3 text-center" Style="background: #fee2e2;">
+                        <MudText Typo="Typo.subtitle2">المصاريف</MudText>
+                        <MudText Typo="Typo.h5" Color="Color.Error">@totalExpenses.ToString("N2") ج</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudPaper Class="pa-3 text-center" Style="background: #fecaca;">
+                        <MudText Typo="Typo.subtitle2">إجمالي المصروفات</MudText>
+                        <MudText Typo="Typo.h5" Color="Color.Error">@((totalPurchases + totalExpenses).ToString("N2")) ج</MudText>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        }
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    private DateTime? fromDate = DateTime.Now.AddMonths(-1);
+    private DateTime? toDate = DateTime.Now;
+    private decimal totalSales = 0;
+    private decimal totalPurchases = 0;
+    private decimal totalExpenses = 0;
+    private int invoicesCount = 0;
+    private bool loading = false;
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        if (!Session.IsAuthenticated || !fromDate.HasValue || !toDate.HasValue) return;
+        loading = true;
+        try
+        {
+            totalSales = await SalesService.GetTotalSalesAsync(Session.BrandId, fromDate.Value, toDate.Value.AddDays(1));
+            totalPurchases = await PurchaseService.GetTotalPurchasesAsync(Session.BrandId, fromDate.Value, toDate.Value.AddDays(1));
+            totalExpenses = await ExpenseService.GetTotalExpensesAsync(Session.BrandId, fromDate.Value, toDate.Value.AddDays(1));
+            
+            var summary = await SalesService.GetSalesSummaryAsync(Session.BrandId, fromDate.Value, toDate.Value.AddDays(1));
+            invoicesCount = summary.Count;
+        }
+        catch { }
+        finally { loading = false; }
+    }
+}

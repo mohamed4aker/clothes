@@ -1,0 +1,122 @@
+@inject ISalesService SalesService
+@inject IBrandSettingsService SettingsService
+@inject UserSession Session
+@inject IJSRuntime JS
+
+<MudDialog>
+    <DialogContent>
+        @if (invoice == null) { <MudProgressLinear Indeterminate="true" /> }
+        else
+        {
+            <div id="invoicePrintArea">
+                <MudPaper Class="pa-3" Style="background: white;">
+                    <div style="text-align: center;">
+                        @if (!string.IsNullOrEmpty(settings?.ReceiptHeader))
+                        {
+                            <MudText Typo="Typo.h6">@settings.ReceiptHeader</MudText>
+                        }
+                        <MudText Typo="Typo.h5"><strong>فاتورة مبيعات</strong></MudText>
+                        <MudText Typo="Typo.subtitle2">@invoice.InvoiceNumber</MudText>
+                        <MudText Typo="Typo.caption">@invoice.CreatedAt.ToString("yyyy/MM/dd HH:mm")</MudText>
+                    </div>
+
+                    <MudDivider Class="my-2" />
+
+                    <MudGrid>
+                        <MudItem xs="6">
+                            <MudText Typo="Typo.body2"><strong>الفرع:</strong> @invoice.BranchName</MudText>
+                            <MudText Typo="Typo.body2"><strong>الكاشير:</strong> @invoice.CashierName</MudText>
+                        </MudItem>
+                        <MudItem xs="6">
+                            @if (!string.IsNullOrEmpty(invoice.CustomerName))
+                            {
+                                <MudText Typo="Typo.body2"><strong>العميل:</strong> @invoice.CustomerName</MudText>
+                            }
+                        </MudItem>
+                    </MudGrid>
+
+                    <MudDivider Class="my-2" />
+
+                    <MudTable Items="@invoice.Items" Dense="true" Bordered="true">
+                        <HeaderContent>
+                            <MudTh>الصنف</MudTh>
+                            <MudTh>الكمية</MudTh>
+                            <MudTh>السعر</MudTh>
+                            <MudTh>الإجمالي</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.ProductName</MudTd>
+                            <MudTd>@context.Quantity</MudTd>
+                            <MudTd>@context.UnitPrice.ToString("N2")</MudTd>
+                            <MudTd>@context.LineTotal.ToString("N2")</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+
+                    <div style="margin-top: 12px;">
+                        <div class="d-flex justify-space-between"><span>الإجمالي:</span><span>@invoice.SubTotal.ToString("N2") ج</span></div>
+                        @if (invoice.DiscountAmount > 0)
+                        {
+                            <div class="d-flex justify-space-between"><span>الخصم:</span><span>-@invoice.DiscountAmount.ToString("N2") ج</span></div>
+                        }
+                        @if (invoice.TaxAmount > 0)
+                        {
+                            <div class="d-flex justify-space-between"><span>الضريبة:</span><span>@invoice.TaxAmount.ToString("N2") ج</span></div>
+                        }
+                        <MudDivider Class="my-1" />
+                        <div class="d-flex justify-space-between" style="font-size: 1.2em; font-weight: bold;">
+                            <span>الإجمالي الكلي:</span><span>@invoice.GrandTotal.ToString("N2") ج</span>
+                        </div>
+                        <div class="d-flex justify-space-between"><span>المدفوع:</span><span>@invoice.PaidAmount.ToString("N2") ج</span></div>
+                        @if (invoice.ChangeAmount > 0)
+                        {
+                            <div class="d-flex justify-space-between"><span>الباقي:</span><span>@invoice.ChangeAmount.ToString("N2") ج</span></div>
+                        }
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(settings?.ReceiptFooter))
+                    {
+                        <MudDivider Class="my-2" />
+                        <div style="text-align: center; margin-top: 12px;">
+                            <MudText Typo="Typo.body2">@settings.ReceiptFooter</MudText>
+                        </div>
+                    }
+                </MudPaper>
+            </div>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Close())">إغلاق</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Print" OnClick="PrintInvoice">
+            طباعة
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int InvoiceId { get; set; }
+    private SaleDetailDto? invoice;
+    private BrandSettingsDto? settings;
+
+    protected override async Task OnInitializedAsync()
+    {
+        invoice = await SalesService.GetSaleDetailsAsync(InvoiceId, Session.BrandId);
+        settings = await SettingsService.GetSettingsAsync(Session.BrandId);
+    }
+
+    private async Task PrintInvoice()
+    {
+        await JS.InvokeVoidAsync("eval", @"
+            var printContent = document.getElementById('invoicePrintArea').innerHTML;
+            var WinPrint = window.open('', '', 'width=400,height=600');
+            WinPrint.document.write('<html><head><title>فاتورة</title>');
+            WinPrint.document.write('<style>body{font-family:Arial;direction:rtl;padding:10px;font-size:12px;} table{width:100%;border-collapse:collapse;} td,th{border:1px solid #ddd;padding:4px;text-align:right;} .d-flex{display:flex;justify-content:space-between;}</style>');
+            WinPrint.document.write('</head><body>');
+            WinPrint.document.write(printContent);
+            WinPrint.document.write('</body></html>');
+            WinPrint.document.close();
+            WinPrint.focus();
+            setTimeout(function(){ WinPrint.print(); WinPrint.close(); }, 500);
+        ");
+    }
+}

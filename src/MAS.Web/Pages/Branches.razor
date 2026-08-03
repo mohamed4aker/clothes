@@ -1,0 +1,95 @@
+@page "/branches"
+@inject IBranchService BranchService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>الفروع - MAS</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12" Class="d-flex justify-space-between align-center">
+        <MudText Typo="Typo.h4">الفروع</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" 
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenAddDialog">
+            إضافة فرع
+        </MudButton>
+    </MudItem>
+</MudGrid>
+
+<MudPaper Class="pa-4 mt-3">
+    @if (branches == null)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else
+    {
+        <MudTable Items="@branches" Hover="true" Bordered="true">
+            <HeaderContent>
+                <MudTh>الكود</MudTh>
+                <MudTh>الاسم</MudTh>
+                <MudTh>الهاتف</MudTh>
+                <MudTh>المدينة</MudTh>
+                <MudTh>رئيسي</MudTh>
+                <MudTh>الإجراءات</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.BranchCode</MudTd>
+                <MudTd>@context.BranchName</MudTd>
+                <MudTd>@context.Phone</MudTd>
+                <MudTd>@context.City</MudTd>
+                <MudTd>
+                    @if (context.IsMainBranch)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Star" Color="Color.Warning" />
+                    }
+                </MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" 
+                                   OnClick="() => OpenEditDialog(context)" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                   OnClick="() => DeleteBranch(context)" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private List<BranchDto>? branches;
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        if (Session.IsAuthenticated)
+            branches = await BranchService.GetBranchesAsync(Session.BrandId);
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var dialog = DialogService.Show<BranchDialog>("إضافة فرع", new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadData();
+    }
+
+    private async Task OpenEditDialog(BranchDto branch)
+    {
+        var parameters = new DialogParameters { ["Branch"] = branch };
+        var dialog = DialogService.Show<BranchDialog>("تعديل الفرع", parameters, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadData();
+    }
+
+    private async Task DeleteBranch(BranchDto branch)
+    {
+        var confirm = await DialogService.ShowMessageBox("تأكيد", $"حذف فرع {branch.BranchName}؟",
+            yesText: "حذف", cancelText: "إلغاء");
+        if (confirm == true)
+        {
+            await BranchService.DeleteBranchAsync(branch.BranchId, Session.BrandId);
+            Snackbar.Add("تم الحذف", Severity.Success);
+            await LoadData();
+        }
+    }
+}

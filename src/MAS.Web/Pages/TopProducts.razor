@@ -1,0 +1,69 @@
+@page "/top-products"
+@inject IReportsService ReportsService
+@inject UserSession Session
+
+<PageTitle>الأكثر مبيعاً - MAS</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">⭐ المنتجات الأكثر مبيعاً</MudText>
+
+<MudGrid Class="mb-3">
+    <MudItem xs="12" md="4">
+        <MudDatePicker @bind-Date="fromDate" Label="من" Variant="Variant.Outlined" />
+    </MudItem>
+    <MudItem xs="12" md="4">
+        <MudDatePicker @bind-Date="toDate" Label="إلى" Variant="Variant.Outlined" />
+    </MudItem>
+    <MudItem xs="12" md="4">
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="LoadData" FullWidth="true" Style="height:56px;">
+            عرض
+        </MudButton>
+    </MudItem>
+</MudGrid>
+
+@if (loading) { <MudProgressLinear Indeterminate="true" /> }
+else if (report?.TopProducts.Any() == true)
+{
+    <MudPaper Class="pa-3">
+        <MudTable Items="@report.TopProducts" Hover="true" Bordered="true">
+            <HeaderContent>
+                <MudTh>#</MudTh>
+                <MudTh>المنتج</MudTh>
+                <MudTh>الكمية المباعة</MudTh>
+                <MudTh>إجمالي الإيرادات</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>
+                    @{
+                        var index = report.TopProducts.IndexOf(context) + 1;
+                        var medal = index == 1 ? "🥇" : index == 2 ? "🥈" : index == 3 ? "🥉" : index.ToString();
+                    }
+                    @medal
+                </MudTd>
+                <MudTd><strong>@context.ProductName</strong></MudTd>
+                <MudTd>@context.QuantitySold</MudTd>
+                <MudTd>@context.Revenue.ToString("N2") ج</MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudPaper>
+}
+else if (report != null)
+{
+    <MudAlert Severity="Severity.Info">لا يوجد بيانات في الفترة المحددة.</MudAlert>
+}
+
+@code {
+    private DateTime? fromDate = DateTime.Now.AddDays(-30);
+    private DateTime? toDate = DateTime.Now;
+    private SalesReportDto? report;
+    private bool loading = false;
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        if (!fromDate.HasValue || !toDate.HasValue) return;
+        loading = true;
+        try { report = await ReportsService.GetSalesReportAsync(Session.BrandId, fromDate.Value, toDate.Value.AddDays(1)); }
+        finally { loading = false; }
+    }
+}

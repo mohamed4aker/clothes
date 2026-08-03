@@ -1,0 +1,19 @@
+@using Microsoft.AspNetCore.Components.Routing
+@inject NavigationManager Nav
+@inject UserSession Session
+
+<Router AppAssembly="@typeof(App).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <PageTitle>غير موجود</PageTitle>
+        <LayoutView Layout="@typeof(MainLayout)">
+            <MudContainer Class="mt-8">
+                <MudAlert Severity="Severity.Warning">الصفحة المطلوبة غير موجودة</MudAlert>
+                <MudButton Href="/" Variant="Variant.Filled" Color="Color.Primary" Class="mt-3">الرجوع للرئيسية</MudButton>
+            </MudContainer>
+        </LayoutView>
+    </NotFound>
+</Router>

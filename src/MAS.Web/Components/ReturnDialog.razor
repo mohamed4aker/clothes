@@ -1,0 +1,163 @@
+@inject ISalesReturnService ReturnService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        @if (invoice == null)
+        {
+            <MudGrid>
+                <MudItem xs="9">
+                    <MudTextField @bind-Value="invoiceIdInput" Label="ID الفاتورة الأصلية *" Variant="Variant.Outlined" 
+                                  HelperText="من جدول المبيعات - عمود InvoiceId" />
+                </MudItem>
+                <MudItem xs="3">
+                    <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="LoadInvoice" FullWidth="true" Style="height: 56px;">
+                        البحث
+                    </MudButton>
+                </MudItem>
+            </MudGrid>
+        }
+        else
+        {
+            <MudPaper Class="pa-2 mb-2" Style="background: #f0fdfa;">
+                <MudText><strong>الفاتورة:</strong> @invoice.InvoiceNumber | <strong>التاريخ:</strong> @invoice.CreatedAt.ToString("yyyy/MM/dd") | <strong>الإجمالي:</strong> @invoice.GrandTotal.ToString("N2")</MudText>
+                @if (!string.IsNullOrEmpty(invoice.CustomerName))
+                {
+                    <MudText><strong>العميل:</strong> @invoice.CustomerName</MudText>
+                }
+            </MudPaper>
+
+            <MudText Typo="Typo.h6" Class="mb-2">الأصناف اللي هتترجع:</MudText>
+            <MudTable Items="@returnItems" Dense="true">
+                <HeaderContent>
+                    <MudTh>الصنف</MudTh>
+                    <MudTh>الكمية الأصلية</MudTh>
+                    <MudTh>كمية الإرجاع</MudTh>
+                    <MudTh>السعر</MudTh>
+                    <MudTh>الإجمالي</MudTh>
+                    <MudTh>للمخزون؟</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.ProductName</MudTd>
+                    <MudTd>@context.OriginalQty</MudTd>
+                    <MudTd>
+                        <MudNumericField @bind-Value="context.ReturnQty" Min="0" Max="@context.OriginalQty" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width:90px" />
+                    </MudTd>
+                    <MudTd>@context.UnitPrice.ToString("N2")</MudTd>
+                    <MudTd>@((context.ReturnQty * context.UnitPrice).ToString("N2"))</MudTd>
+                    <MudTd>
+                        <MudCheckBox T="bool" @bind-Value="context.BackToStock" />
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+
+            <MudGrid Class="mt-3">
+                <MudItem xs="12" md="6">
+                    <MudSelect @bind-Value="refundMethod" Label="طريقة الإرجاع" Variant="Variant.Outlined">
+                        <MudSelectItem Value="@("Cash")">كاش</MudSelectItem>
+                        <MudSelectItem Value="@("StoreCredit")">رصيد للعميل</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="reason" Label="سبب الإرجاع *" Variant="Variant.Outlined" Required="true" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudPaper Class="pa-3" Style="background: #fef3c7;">
+                        <MudText Typo="Typo.h6">إجمالي المرتجع: @TotalReturn.ToString("N2") ج</MudText>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">إلغاء</MudButton>
+        @if (invoice != null)
+        {
+            <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="Submit" Disabled="@isSaving">
+                @if (isSaving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> }
+                else { <MudText>تأكيد الإرجاع</MudText> }
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    private int invoiceIdInput;
+    private SaleDetailDto? invoice;
+    private List<ReturnItemModel> returnItems = new();
+    private string refundMethod = "Cash";
+    private string reason = string.Empty;
+    private bool isSaving = false;
+
+    private decimal TotalReturn => returnItems.Sum(i => i.ReturnQty * i.UnitPrice);
+
+    private async Task LoadInvoice()
+    {
+        if (invoiceIdInput <= 0)
+        {
+            Snackbar.Add("ادخل ID الفاتورة (رقم) من جدول المبيعات", Severity.Warning);
+            return;
+        }
+
+        invoice = await ReturnService.GetInvoiceForReturnAsync(invoiceIdInput, Session.BrandId);
+        if (invoice == null)
+        {
+            Snackbar.Add("الفاتورة غير موجودة", Severity.Error);
+            return;
+        }
+
+        returnItems = invoice.Items.Select(it => new ReturnItemModel
+        {
+            VariantId = it.VariantId,
+            ProductName = it.ProductName,
+            OriginalQty = it.Quantity,
+            ReturnQty = 0,
+            UnitPrice = it.UnitPrice,
+            BackToStock = true
+        }).ToList();
+    }
+
+    private async Task Submit()
+    {
+        if (string.IsNullOrWhiteSpace(reason)) { Snackbar.Add("ادخل سبب الإرجاع", Severity.Warning); return; }
+        var itemsToReturn = returnItems.Where(i => i.ReturnQty > 0).ToList();
+        if (!itemsToReturn.Any()) { Snackbar.Add("اختر أصناف للإرجاع", Severity.Warning); return; }
+
+        isSaving = true;
+        try
+        {
+            var request = new CreateSalesReturnRequest
+            {
+                OriginalInvoiceId = invoice!.InvoiceId,
+                Reason = reason,
+                RefundMethod = refundMethod,
+                Items = itemsToReturn.Select(i => new ReturnItemRequest2
+                {
+                    VariantId = i.VariantId,
+                    Quantity = i.ReturnQty,
+                    UnitPrice = i.UnitPrice,
+                    BackToStock = i.BackToStock
+                }).ToList()
+            };
+
+            await ReturnService.CreateReturnAsync(Session.BrandId, Session.UserId, request);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { Snackbar.Add($"خطأ: {ex.Message}", Severity.Error); }
+        finally { isSaving = false; }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private class ReturnItemModel
+    {
+        public int VariantId { get; set; }
+        public string ProductName { get; set; } = string.Empty;
+        public decimal OriginalQty { get; set; }
+        public decimal ReturnQty { get; set; }
+        public decimal UnitPrice { get; set; }
+        public bool BackToStock { get; set; } = true;
+    }
+}

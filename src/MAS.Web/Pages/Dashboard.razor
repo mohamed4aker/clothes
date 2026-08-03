@@ -1,0 +1,79 @@
+@page "/dashboard"
+@inject IAdvancedDashboardService DashService
+@inject UserSession Session
+
+<PageTitle>لوحة التحكم - MAS</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">📊 لوحة التحكم</MudText>
+
+@if (data == null)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else
+{
+    <MudTabs Elevation="2" Rounded="true" PanelClass="pa-4" @bind-ActivePanelIndex="activeTab">
+        <MudTabPanel Text="اليوم"><PeriodCardComponent Stats="@data.Today" /></MudTabPanel>
+        <MudTabPanel Text="الأسبوع"><PeriodCardComponent Stats="@data.Week" /></MudTabPanel>
+        <MudTabPanel Text="الشهر"><PeriodCardComponent Stats="@data.Month" /></MudTabPanel>
+        <MudTabPanel Text="السنة"><PeriodCardComponent Stats="@data.Year" /></MudTabPanel>
+        <MudTabPanel Text="كل الوقت"><PeriodCardComponent Stats="@data.AllTime" /></MudTabPanel>
+    </MudTabs>
+
+    <MudGrid Class="mt-4">
+        <MudItem xs="12" md="3">
+            <MudPaper Class="pa-3" Style="border-right: 4px solid #92400e;">
+                <MudText Typo="Typo.subtitle2">إجمالي المنتجات</MudText>
+                <MudText Typo="Typo.h5">@data.TotalProducts</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudPaper Class="pa-3" Style="border-right: 4px solid #ef4444;">
+                <MudText Typo="Typo.subtitle2">منتجات منخفضة المخزون</MudText>
+                <MudText Typo="Typo.h5">@data.LowStockCount</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudPaper Class="pa-3" Style="border-right: 4px solid #f59e0b;">
+                <MudText Typo="Typo.subtitle2">قيمة المخزون</MudText>
+                <MudText Typo="Typo.h5">@data.InventoryValue.ToString("N2") ج</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudPaper Class="pa-3" Style="border-right: 4px solid #b45309;">
+                <MudText Typo="Typo.subtitle2">إجمالي العملاء</MudText>
+                <MudText Typo="Typo.h5">@data.TotalCustomers</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    @if (data.TopProducts.Any())
+    {
+        <MudPaper Class="pa-3 mt-4">
+            <MudText Typo="Typo.h6" Class="mb-2">🏆 أكثر المنتجات مبيعاً (آخر 30 يوم)</MudText>
+            <MudTable Items="@data.TopProducts" Dense="true">
+                <HeaderContent>
+                    <MudTh>المنتج</MudTh>
+                    <MudTh>الكمية</MudTh>
+                    <MudTh>الإيرادات</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.ProductName</MudTd>
+                    <MudTd>@context.QuantitySold</MudTd>
+                    <MudTd>@context.Revenue.ToString("N2") ج</MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudPaper>
+    }
+}
+
+@code {
+    private AdvancedDashboardDto? data;
+    private int activeTab = 2; // الشهر افتراضياً
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Session.IsAuthenticated)
+            data = await DashService.GetDashboardAsync(Session.BrandId, Session.CurrentBranchId);
+    }
+}

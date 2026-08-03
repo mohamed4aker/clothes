@@ -1,0 +1,68 @@
+@page "/initial-stocks"
+@inject IInitialStockService InitialStockService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>مخزن أول المدة - MAS</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12" Class="d-flex justify-space-between align-center">
+        <MudText Typo="Typo.h4">📋 مخزن أول المدة</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAdd">
+            إضافة رصيد افتتاحي
+        </MudButton>
+    </MudItem>
+</MudGrid>
+
+<MudAlert Severity="Severity.Info" Class="mt-3">
+    💡 مخزن أول المدة بيضيف الكميات للمخزون <strong>بدون</strong> ما يأثر على الخزنة (مش زي فاتورة الشراء)
+</MudAlert>
+
+<MudPaper Class="pa-4 mt-3">
+    @if (entries == null) { <MudProgressLinear Indeterminate="true" /> }
+    else if (!entries.Any()) { <MudAlert Severity="Severity.Info">لا يوجد سجلات مخزن أول المدة بعد.</MudAlert> }
+    else
+    {
+        <MudTable Items="@entries" Hover="true" Bordered="true">
+            <HeaderContent>
+                <MudTh>الرقم</MudTh>
+                <MudTh>التاريخ</MudTh>
+                <MudTh>الفرع</MudTh>
+                <MudTh>المخزن</MudTh>
+                <MudTh>عدد الأصناف</MudTh>
+                <MudTh>القيمة الإجمالية</MudTh>
+                <MudTh>ملاحظات</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.EntryNumber</MudTd>
+                <MudTd>@context.EntryDate.ToString("yyyy/MM/dd")</MudTd>
+                <MudTd>@context.BranchName</MudTd>
+                <MudTd>@context.WarehouseName</MudTd>
+                <MudTd>@context.ItemsCount</MudTd>
+                <MudTd><strong>@context.TotalValue.ToString("N2") ج</strong></MudTd>
+                <MudTd>@context.Notes</MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private List<InitialStockDto>? entries;
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        if (Session.IsAuthenticated)
+            entries = await InitialStockService.GetInitialStocksAsync(Session.BrandId);
+    }
+
+    private async Task OpenAdd()
+    {
+        var dialog = DialogService.Show<InitialStockDialog>("مخزن أول المدة - رصيد افتتاحي", 
+            new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadData();
+    }
+}

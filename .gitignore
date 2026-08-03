@@ -1,0 +1,30 @@
+## .NET
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+publish/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Visual Studio / Rider / VS Code
+.vs/
+.idea/
+.vscode/
+
+## أسرار وإعدادات محلية — متترفعش على GitHub أبداً
+appsettings.Production.json
+appsettings.*.Local.json
+*.pfx
+*.pubxml.user
+
+## لوجات
+logs/
+*.log
+
+## macOS / Windows
+.DS_Store
+__MACOSX/
+Thumbs.db

@@ -1,0 +1,63 @@
+@inject ICustomerService CustomerService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="model.FullName" Label="اسم العميل *" Variant="Variant.Outlined" Required="true" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="model.Phone" Label="رقم الهاتف" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudSelect @bind-Value="model.CustomerType" Label="نوع العميل" Variant="Variant.Outlined">
+                    <MudSelectItem Value="@("Retail")">تجزئة</MudSelectItem>
+                    <MudSelectItem Value="@("Wholesale")">جملة</MudSelectItem>
+                    <MudSelectItem Value="@("VIP")">VIP</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">إلغاء</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@isSaving">
+            @if (isSaving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> }
+            else { <MudText>إضافة واختيار</MudText> }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    private CreateCustomerRequest model = new() { CustomerType = "Retail" };
+    private bool isSaving = false;
+
+    private async Task Submit()
+    {
+        if (string.IsNullOrWhiteSpace(model.FullName))
+        {
+            Snackbar.Add("ادخل اسم العميل", Severity.Warning);
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            var customerId = await CustomerService.CreateCustomerAsync(Session.BrandId, model);
+            var customer = await CustomerService.GetCustomerByIdAsync(customerId, Session.BrandId);
+            MudDialog.Close(DialogResult.Ok(customer));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطأ: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

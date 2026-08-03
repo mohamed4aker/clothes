@@ -1,0 +1,149 @@
+@page "/expenses"
+@inject IExpenseService ExpenseService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>المصاريف - MAS</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12" Class="d-flex justify-space-between align-center">
+        <MudText Typo="Typo.h4">💸 المصاريف</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAdd">
+            إضافة مصروف
+        </MudButton>
+    </MudItem>
+</MudGrid>
+
+<!-- الفلاتر -->
+<MudPaper Class="pa-3 mt-3 mb-3">
+    <MudGrid AlignItems="AlignItems.Center">
+        <MudItem xs="12" md="3">
+            <MudDatePicker @bind-Date="fromDate" Label="من تاريخ" Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudDatePicker @bind-Date="toDate" Label="إلى تاريخ" Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudSelect T="string" @bind-Value="filterCategory" Label="التصنيف" Variant="Variant.Outlined" Clearable="true">
+                <MudSelectItem Value="@("")">- الكل -</MudSelectItem>
+                <MudSelectItem Value="@("إيجار")">إيجار</MudSelectItem>
+                <MudSelectItem Value="@("كهرباء")">كهرباء</MudSelectItem>
+                <MudSelectItem Value="@("مياه")">مياه</MudSelectItem>
+                <MudSelectItem Value="@("رواتب")">رواتب</MudSelectItem>
+                <MudSelectItem Value="@("نقل")">نقل</MudSelectItem>
+                <MudSelectItem Value="@("صيانة")">صيانة</MudSelectItem>
+                <MudSelectItem Value="@("تسويق")">تسويق</MudSelectItem>
+                <MudSelectItem Value="@("أخرى")">أخرى</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="LoadData" 
+                       FullWidth="true" StartIcon="@Icons.Material.Filled.Refresh" Style="height: 56px;">
+                تحديث
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (expenses != null && FilteredExpenses.Any())
+{
+    <MudGrid Class="mb-3">
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-3 text-center" Style="background: #fee2e2;">
+                <MudText Typo="Typo.subtitle2">إجمالي المصاريف</MudText>
+                <MudText Typo="Typo.h5" Color="Color.Error">@FilteredExpenses.Sum(e => e.Amount).ToString("N2") ج</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-3 text-center" Style="background: #dbeafe;">
+                <MudText Typo="Typo.subtitle2">عدد المصاريف</MudText>
+                <MudText Typo="Typo.h5">@FilteredExpenses.Count</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-3 text-center" Style="background: #fef3c7;">
+                <MudText Typo="Typo.subtitle2">متوسط المصروف</MudText>
+                <MudText Typo="Typo.h5" Color="Color.Warning">@(FilteredExpenses.Any() ? FilteredExpenses.Average(e => e.Amount).ToString("N2") : "0") ج</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+<MudPaper Class="pa-4">
+    @if (expenses == null) { <MudProgressLinear Indeterminate="true" /> }
+    else if (!FilteredExpenses.Any()) { <MudAlert Severity="Severity.Info">لا يوجد مصاريف.</MudAlert> }
+    else
+    {
+        <MudTable Items="@FilteredExpenses" Hover="true" Bordered="true">
+            <HeaderContent>
+                <MudTh>التاريخ</MudTh>
+                <MudTh>الوقت</MudTh>
+                <MudTh>التصنيف</MudTh>
+                <MudTh>الوصف</MudTh>
+                <MudTh>المبلغ</MudTh>
+                <MudTh>طريقة الدفع</MudTh>
+                <MudTh>الإجراءات</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.ExpenseDate.ToString("yyyy/MM/dd")</MudTd>
+                <MudTd>@context.ExpenseDate.ToString("HH:mm")</MudTd>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small" Color="Color.Warning">@context.Category</MudChip>
+                </MudTd>
+                <MudTd>@context.Description</MudTd>
+                <MudTd><strong style="color: red;">@context.Amount.ToString("N2") ج</strong></MudTd>
+                <MudTd>@TranslatePayment(context.PaymentMethod)</MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" 
+                                   OnClick="@(() => Delete(context))" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private List<ExpenseDto>? expenses;
+    private DateTime? fromDate = DateTime.Now.AddMonths(-1);
+    private DateTime? toDate = DateTime.Now;
+    private string filterCategory = "";
+
+    private List<ExpenseDto> FilteredExpenses => expenses?.Where(e =>
+        string.IsNullOrEmpty(filterCategory) || e.Category == filterCategory).ToList() ?? new();
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        if (!Session.IsAuthenticated || !fromDate.HasValue || !toDate.HasValue) return;
+        expenses = await ExpenseService.GetExpensesAsync(Session.BrandId, fromDate.Value, toDate.Value.AddDays(1));
+    }
+
+    private async Task OpenAdd()
+    {
+        var dialog = DialogService.Show<ExpenseDialog>("إضافة مصروف", 
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadData();
+    }
+
+    private async Task Delete(ExpenseDto expense)
+    {
+        var confirm = await DialogService.ShowMessageBox("تأكيد", $"حذف هذا المصروف؟", yesText: "حذف", cancelText: "إلغاء");
+        if (confirm == true)
+        {
+            await ExpenseService.DeleteExpenseAsync(expense.ExpenseId, Session.BrandId);
+            Snackbar.Add("تم الحذف", Severity.Success);
+            await LoadData();
+        }
+    }
+
+    private string TranslatePayment(string method) => method switch
+    {
+        "Cash" => "كاش",
+        "Visa" => "فيزا",
+        "BankTransfer" => "تحويل",
+        _ => method
+    };
+}

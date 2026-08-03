@@ -1,0 +1,123 @@
+@inject IProductService ProductService
+@inject ICategoryService CategoryService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.ProductName" Label="اسم المنتج *" Variant="Variant.Outlined" Required="true" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.SKU" Label="كود المنتج (SKU) *" Variant="Variant.Outlined" Required="true" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.Barcode" Label="الباركود" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudSelect T="int?" @bind-Value="model.CategoryId" Label="التصنيف" Variant="Variant.Outlined">
+                    <MudSelectItem T="int?" Value="null">- بدون -</MudSelectItem>
+                    @if (categories != null)
+                    {
+                        @foreach (var cat in categories)
+                        {
+                            <MudSelectItem T="int?" Value="cat.CategoryId">@cat.CategoryName</MudSelectItem>
+                        }
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudNumericField @bind-Value="model.BaseCostPrice" Label="سعر التكلفة *" Variant="Variant.Outlined" Min="0" Format="N2" />
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudNumericField @bind-Value="model.BaseSellingPrice" Label="سعر البيع *" Variant="Variant.Outlined" Min="0" Format="N2" />
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudNumericField T="decimal?" @bind-Value="model.OnlinePrice" Label="سعر الأونلاين" Variant="Variant.Outlined" Format="N2" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudNumericField @bind-Value="model.TaxRate" Label="نسبة الضريبة %" Variant="Variant.Outlined" Min="0" Max="100" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudNumericField @bind-Value="model.MinStock" Label="حد الإنذار" Variant="Variant.Outlined" Min="0" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="model.Description" Label="الوصف" Variant="Variant.Outlined" Lines="2" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudCheckBox T="bool" @bind-Value="model.ShowOnline" Label="عرض على الموقع الإلكتروني" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">إلغاء</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@isSaving">
+            @if (isSaving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> }
+            else { <MudText>حفظ</MudText> }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public ProductDto? Product { get; set; }
+
+    private CreateProductRequest model = new() { TaxRate = 14 };
+    private List<CategoryDto>? categories;
+    private bool isSaving = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        categories = await CategoryService.GetCategoriesAsync(Session.BrandId);
+
+        if (Product != null)
+        {
+            model = new CreateProductRequest
+            {
+                CategoryId = Product.CategoryId,
+                SKU = Product.SKU,
+                Barcode = Product.Barcode,
+                ProductName = Product.ProductName,
+                Description = Product.Description,
+                BaseCostPrice = Product.BaseCostPrice,
+                BaseSellingPrice = Product.BaseSellingPrice,
+                OnlinePrice = Product.OnlinePrice,
+                TaxRate = Product.TaxRate,
+                MinStock = Product.MinStock,
+                ShowOnline = Product.ShowOnline
+            };
+        }
+    }
+
+    private async Task Submit()
+    {
+        if (string.IsNullOrWhiteSpace(model.ProductName) || string.IsNullOrWhiteSpace(model.SKU))
+        {
+            Snackbar.Add("ادخل الاسم والكود", Severity.Warning);
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            if (Product == null)
+                await ProductService.CreateProductAsync(Session.BrandId, Session.UserId, model);
+            else
+                await ProductService.UpdateProductAsync(Product.ProductId, Session.BrandId, model);
+
+            Snackbar.Add("تم الحفظ", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطأ: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

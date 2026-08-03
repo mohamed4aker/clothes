@@ -1,0 +1,104 @@
+@inject IPromotionService PromotionService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.Name" Label="اسم العرض *" Variant="Variant.Outlined" Required="true" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.CouponCode" Label="كود الكوبون (اختياري)" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="model.Description" Label="الوصف" Variant="Variant.Outlined" Lines="2" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudSelect @bind-Value="model.DiscountType" Label="نوع الخصم" Variant="Variant.Outlined">
+                    <MudSelectItem Value="@("Percentage")">نسبة مئوية %</MudSelectItem>
+                    <MudSelectItem Value="@("FixedAmount")">مبلغ ثابت</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudNumericField @bind-Value="model.DiscountValue" Label="قيمة الخصم *" Variant="Variant.Outlined" Min="0" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudNumericField T="decimal?" @bind-Value="model.MinPurchaseAmount" Label="الحد الأدنى للفاتورة" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudNumericField T="decimal?" @bind-Value="model.MaxDiscountAmount" Label="أقصى قيمة خصم" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudDatePicker @bind-Date="startDate" Label="تاريخ البدء *" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudDatePicker @bind-Date="endDate" Label="تاريخ الانتهاء *" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudNumericField T="int?" @bind-Value="model.UsageLimit" Label="حد الاستخدام (اختياري)" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudCheckBox T="bool" @bind-Value="model.ApplyAutomatically" Label="تطبيق تلقائي بدون كوبون" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">إلغاء</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">حفظ</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public PromotionDto? Promotion { get; set; }
+
+    private CreatePromotionRequest model = new() { DiscountType = "Percentage", StartDate = DateTime.Now, EndDate = DateTime.Now.AddMonths(1) };
+    private DateTime? startDate = DateTime.Now;
+    private DateTime? endDate = DateTime.Now.AddMonths(1);
+
+    protected override void OnInitialized()
+    {
+        if (Promotion != null)
+        {
+            model = new CreatePromotionRequest
+            {
+                Name = Promotion.Name,
+                CouponCode = Promotion.CouponCode,
+                DiscountType = Promotion.DiscountType,
+                DiscountValue = Promotion.DiscountValue,
+                MinPurchaseAmount = Promotion.MinPurchaseAmount,
+                MaxDiscountAmount = Promotion.MaxDiscountAmount,
+                StartDate = Promotion.StartDate,
+                EndDate = Promotion.EndDate,
+                UsageLimit = Promotion.UsageLimit,
+                ApplyAutomatically = Promotion.ApplyAutomatically
+            };
+            startDate = Promotion.StartDate;
+            endDate = Promotion.EndDate;
+        }
+    }
+
+    private async Task Submit()
+    {
+        if (string.IsNullOrWhiteSpace(model.Name)) { Snackbar.Add("ادخل اسم العرض", Severity.Warning); return; }
+        if (!startDate.HasValue || !endDate.HasValue) { Snackbar.Add("ادخل تواريخ البدء والانتهاء", Severity.Warning); return; }
+
+        try
+        {
+            model.StartDate = startDate.Value;
+            model.EndDate = endDate.Value;
+
+            if (Promotion == null)
+                await PromotionService.CreatePromotionAsync(Session.BrandId, model);
+            else
+                await PromotionService.UpdatePromotionAsync(Promotion.PromotionId, Session.BrandId, model);
+
+            Snackbar.Add("تم الحفظ", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { Snackbar.Add($"خطأ: {ex.Message}", Severity.Error); }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

@@ -1,0 +1,180 @@
+@page "/shop"
+@page "/shop/{BrandSlug}"
+@layout EmptyLayout
+@inject IOnlineOrderService OrderService
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>المتجر - MAS</PageTitle>
+
+<style>
+    .shop-header {
+        background: linear-gradient(135deg, #92400e 0%, #b45309 100%);
+        color: white;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    .product-card {
+        cursor: pointer;
+        transition: transform 0.2s;
+        height: 100%;
+    }
+    .product-card:hover {
+        transform: scale(1.03);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+    .product-img {
+        width: 100%;
+        height: 180px;
+        object-fit: cover;
+        background: #f3f4f6;
+    }
+    .no-img {
+        width: 100%;
+        height: 180px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f3f4f6;
+        color: #9ca3af;
+        font-size: 48px;
+    }
+    .cart-fixed {
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        z-index: 100;
+    }
+</style>
+
+<div class="shop-header">
+    <MudContainer>
+        <MudGrid>
+            <MudItem xs="12" md="8">
+                <MudText Typo="Typo.h3">🛍️ متجر MAS</MudText>
+                <MudText Typo="Typo.subtitle1">تسوق براحتك واطلب أونلاين - الدفع عند الاستلام</MudText>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudTextField @bind-Value="searchText" Placeholder="ابحث عن منتج..." 
+                              Variant="Variant.Filled" 
+                              Adornment="Adornment.Start" 
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              Style="background: white; border-radius: 8px;" />
+            </MudItem>
+        </MudGrid>
+    </MudContainer>
+</div>
+
+<MudContainer>
+    @if (products == null) { <MudProgressLinear Indeterminate="true" /> }
+    else if (!FilteredProducts.Any())
+    {
+        <MudAlert Severity="Severity.Info">لا يوجد منتجات متاحة حالياً.</MudAlert>
+    }
+    else
+    {
+        <MudGrid>
+            @foreach (var product in FilteredProducts)
+            {
+                <MudItem xs="6" sm="4" md="3">
+                    <MudPaper Class="product-card pa-2">
+                        @if (!string.IsNullOrEmpty(product.ImageUrl))
+                        {
+                            <img src="@product.ImageUrl" class="product-img" />
+                        }
+                        else
+                        {
+                            <div class="no-img">📦</div>
+                        }
+                        <MudText Typo="Typo.subtitle1" Style="font-weight: bold; margin-top: 8px;">@product.ProductName</MudText>
+                        @if (!string.IsNullOrEmpty(product.CategoryName))
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@product.CategoryName</MudText>
+                        }
+                        <MudText Typo="Typo.h6" Color="Color.Primary" Style="margin: 8px 0;">@product.Price.ToString("N2") ج</MudText>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" 
+                                   FullWidth="true" StartIcon="@Icons.Material.Filled.AddShoppingCart"
+                                   OnClick="() => AddToCart(product)">
+                            أضف للسلة
+                        </MudButton>
+                    </MudPaper>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+</MudContainer>
+
+@if (cart.Any())
+{
+    <div class="cart-fixed">
+        <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Large"
+                   StartIcon="@Icons.Material.Filled.ShoppingCart"
+                   OnClick="OpenCheckout" Style="border-radius: 50px; padding: 12px 24px;">
+            السلة (@cart.Sum(c => c.Quantity)) - @CartTotal.ToString("N2") ج
+        </MudButton>
+    </div>
+}
+
+@code {
+    [Parameter] public string? BrandSlug { get; set; }
+    private List<OnlineProductDto>? products;
+    private List<ShopCartItem> cart = new();
+    private string searchText = string.Empty;
+    private int brandId = 1; // مؤقتاً - في النسخة الجاية هنحدد من الـ slug
+
+    private List<OnlineProductDto> FilteredProducts =>
+        products?.Where(p => string.IsNullOrEmpty(searchText) ||
+            p.ProductName.Contains(searchText, StringComparison.OrdinalIgnoreCase)).ToList() ?? new();
+
+    private decimal CartTotal => cart.Sum(c => c.UnitPrice * c.Quantity);
+
+    protected override async Task OnInitializedAsync()
+    {
+        products = await OrderService.GetOnlineProductsAsync(brandId);
+    }
+
+    private void AddToCart(OnlineProductDto product)
+    {
+        var existing = cart.FirstOrDefault(c => c.VariantId == product.VariantId);
+        if (existing != null)
+        {
+            if (existing.Quantity >= product.Stock)
+            {
+                Snackbar.Add("الكمية الموجودة محدودة", Severity.Warning);
+                return;
+            }
+            existing.Quantity++;
+        }
+        else
+        {
+            cart.Add(new ShopCartItem
+            {
+                VariantId = product.VariantId,
+                ProductName = product.ProductName,
+                UnitPrice = product.Price,
+                Quantity = 1,
+                MaxStock = product.Stock
+            });
+        }
+        Snackbar.Add($"تم إضافة {product.ProductName}", Severity.Success);
+    }
+
+    private async Task OpenCheckout()
+    {
+        var parameters = new DialogParameters 
+        { 
+            ["Cart"] = cart,
+            ["BrandId"] = brandId
+        };
+        var dialog = DialogService.Show<CheckoutDialog>("إتمام الطلب", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            cart.Clear();
+            Snackbar.Add("✅ تم تسجيل طلبك بنجاح! هنتواصل معاك قريب", Severity.Success);
+        }
+    }
+
+}

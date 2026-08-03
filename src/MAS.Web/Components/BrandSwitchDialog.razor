@@ -1,0 +1,88 @@
+@inject IBrandService BrandService
+@inject IBranchService BranchService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.h6" Class="mb-3">🔄 التبديل بين البراندات</MudText>
+        
+        @if (brands == null) { <MudProgressLinear Indeterminate="true" /> }
+        else if (brands.Count <= 1)
+        {
+            <MudAlert Severity="Severity.Info">
+                لديك براند واحد فقط. لإضافة براند جديد، تحدث مع الإدارة.
+            </MudAlert>
+        }
+        else
+        {
+            <MudList T="string" Clickable="true">
+                @foreach (var brand in brands)
+                {
+                    <MudListItem T="string" 
+                                 OnClick="@(() => SwitchTo(brand))"
+                                 Disabled="@(brand.BrandId == Session.BrandId)">
+                        <div class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Business" Class="mr-2" />
+                            <div>
+                                <MudText Typo="Typo.body1">
+                                    <strong>@brand.BrandName</strong>
+                                    @if (brand.BrandId == Session.BrandId)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Class="ml-2">الحالي</MudChip>
+                                    }
+                                </MudText>
+                                <MudText Typo="Typo.caption">@brand.BusinessType</MudText>
+                            </div>
+                        </div>
+                    </MudListItem>
+                }
+            </MudList>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Close())">إغلاق</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    private List<BrandDto>? brands;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // نحاول نجيب كل البراندات لو الـ Owner عنده أكتر من واحد
+        try
+        {
+            brands = await BrandService.GetMyBrandsAsync(Session.OwnerId);
+            // لو OwnerId مش متاح، نستخدم BrandId الحالي
+            if (brands == null || !brands.Any())
+            {
+                brands = new List<BrandDto>();
+            }
+        }
+        catch
+        {
+            brands = new List<BrandDto>();
+        }
+    }
+
+    private async Task SwitchTo(BrandDto brand)
+    {
+        if (brand.BrandId == Session.BrandId) return;
+        
+        try
+        {
+            var newBranches = await BranchService.GetBranchesAsync(brand.BrandId);
+            Session.SwitchBrand(brand.BrandId, brand.BrandName, newBranches);
+            Snackbar.Add($"تم التبديل إلى: {brand.BrandName}", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+            Nav.NavigateTo("/dashboard", true);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطأ: {ex.Message}", Severity.Error);
+        }
+    }
+}

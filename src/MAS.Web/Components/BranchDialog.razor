@@ -1,0 +1,84 @@
+@inject IBranchService BranchService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.BranchName" Label="اسم الفرع *" Variant="Variant.Outlined" Required="true" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.BranchCode" Label="كود الفرع" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.Phone" Label="الهاتف" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.City" Label="المدينة" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.Governorate" Label="المحافظة" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudCheckBox T="bool" @bind-Value="model.IsMainBranch" Label="فرع رئيسي" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="model.Address" Label="العنوان التفصيلي" Variant="Variant.Outlined" Lines="2" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">إلغاء</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">حفظ</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public BranchDto? Branch { get; set; }
+
+    private CreateBranchRequest model = new();
+
+    protected override void OnInitialized()
+    {
+        if (Branch != null)
+        {
+            model = new CreateBranchRequest
+            {
+                BranchName = Branch.BranchName,
+                BranchCode = Branch.BranchCode,
+                Phone = Branch.Phone,
+                Address = Branch.Address,
+                City = Branch.City,
+                Governorate = Branch.Governorate,
+                IsMainBranch = Branch.IsMainBranch
+            };
+        }
+    }
+
+    private async Task Submit()
+    {
+        if (string.IsNullOrWhiteSpace(model.BranchName))
+        {
+            Snackbar.Add("ادخل اسم الفرع", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            if (Branch == null)
+                await BranchService.CreateBranchAsync(Session.BrandId, model);
+            else
+                await BranchService.UpdateBranchAsync(Branch.BranchId, Session.BrandId, model);
+            Snackbar.Add("تم الحفظ", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطأ: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

@@ -1,0 +1,72 @@
+@page "/stocktakes"
+@inject IStockTakeService StockTakeService
+@inject IBranchService BranchService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>الجرد - MAS</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12" Class="d-flex justify-space-between align-center">
+        <MudText Typo="Typo.h4">📋 الجرد والتسوية</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="StartStockTake">
+            بدء جرد جديد
+        </MudButton>
+    </MudItem>
+</MudGrid>
+
+<MudPaper Class="pa-4 mt-3">
+    @if (stockTakes == null) { <MudProgressLinear Indeterminate="true" /> }
+    else if (!stockTakes.Any()) { <MudAlert Severity="Severity.Info">لا يوجد عمليات جرد سابقة.</MudAlert> }
+    else
+    {
+        <MudTable Items="@stockTakes" Hover="true" Bordered="true">
+            <HeaderContent>
+                <MudTh>رقم الجرد</MudTh>
+                <MudTh>التاريخ</MudTh>
+                <MudTh>الفرع</MudTh>
+                <MudTh>عدد الأصناف</MudTh>
+                <MudTh>قيمة الفرق</MudTh>
+                <MudTh>الحالة</MudTh>
+                <MudTh>الملاحظات</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.StockTakeNumber</MudTd>
+                <MudTd>@context.StockTakeDate.ToString("yyyy/MM/dd")</MudTd>
+                <MudTd>@context.BranchName</MudTd>
+                <MudTd>@context.ItemsCount</MudTd>
+                <MudTd>
+                    <span style="color: @(context.TotalDifferenceValue >= 0 ? "green" : "red");">
+                        @context.TotalDifferenceValue.ToString("N2")
+                    </span>
+                </MudTd>
+                <MudTd>
+                    <MudChip T="string" Color="@(context.Status == "Completed" ? Color.Success : Color.Default)" Size="Size.Small">
+                        @(context.Status == "Completed" ? "مكتمل" : "جديد")
+                    </MudChip>
+                </MudTd>
+                <MudTd>@context.Notes</MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private List<StockTakeDto>? stockTakes;
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        if (Session.IsAuthenticated)
+            stockTakes = await StockTakeService.GetStockTakesAsync(Session.BrandId);
+    }
+
+    private async Task StartStockTake()
+    {
+        var dialog = DialogService.Show<StockTakeDialog>("جرد جديد", new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled) { Snackbar.Add("تم تسجيل الجرد", Severity.Success); await LoadData(); }
+    }
+}

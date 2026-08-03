@@ -1,0 +1,110 @@
+@inject ICustomerService CustomerService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.FullName" Label="الاسم الكامل *" Variant="Variant.Outlined" Required="true" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.Phone" Label="رقم الهاتف" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.Email" Label="البريد الإلكتروني" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudSelect @bind-Value="model.Gender" Label="النوع" Variant="Variant.Outlined">
+                    <MudSelectItem Value="@("Male")">ذكر</MudSelectItem>
+                    <MudSelectItem Value="@("Female")">أنثى</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudDatePicker @bind-Date="model.BirthDate" Label="تاريخ الميلاد" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudSelect @bind-Value="model.CustomerType" Label="نوع العميل" Variant="Variant.Outlined">
+                    <MudSelectItem Value="@("Retail")">تجزئة</MudSelectItem>
+                    <MudSelectItem Value="@("Wholesale")">جملة</MudSelectItem>
+                    <MudSelectItem Value="@("VIP")">VIP</MudSelectItem>
+                    <MudSelectItem Value="@("B2B")">شركات</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="model.Address" Label="العنوان" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.TaxNumber" Label="الرقم الضريبي (B2B)" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudNumericField @bind-Value="model.CreditLimit" Label="حد الائتمان" Variant="Variant.Outlined" Min="0" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="model.Notes" Label="ملاحظات" Variant="Variant.Outlined" Lines="2" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">إلغاء</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@isSaving">
+            @if (isSaving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> }
+            else { <MudText>حفظ</MudText> }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public CustomerDto? Customer { get; set; }
+
+    private CreateCustomerRequest model = new() { CustomerType = "Retail" };
+    private bool isSaving = false;
+
+    protected override void OnInitialized()
+    {
+        if (Customer != null)
+        {
+            model = new CreateCustomerRequest
+            {
+                FullName = Customer.FullName,
+                Phone = Customer.Phone,
+                Email = Customer.Email,
+                Gender = Customer.Gender,
+                BirthDate = Customer.BirthDate,
+                CustomerType = Customer.CustomerType
+            };
+        }
+    }
+
+    private async Task Submit()
+    {
+        if (string.IsNullOrWhiteSpace(model.FullName))
+        {
+            Snackbar.Add("ادخل اسم العميل", Severity.Warning);
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            if (Customer == null)
+                await CustomerService.CreateCustomerAsync(Session.BrandId, model);
+            else
+                await CustomerService.UpdateCustomerAsync(Customer.CustomerId, Session.BrandId, model);
+
+            Snackbar.Add("تم الحفظ", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطأ: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

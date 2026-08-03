@@ -1,0 +1,168 @@
+@page "/sales"
+@inject ISalesService SalesService
+@inject UserSession Session
+@inject IDialogService DialogService
+@inject NavigationManager Nav
+
+<PageTitle>المبيعات - MAS</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12" Class="d-flex justify-space-between align-center">
+        <MudText Typo="Typo.h4">📋 المبيعات والفواتير</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" 
+                   OnClick="@(() => Nav.NavigateTo("/pos"))">
+            فاتورة جديدة (POS)
+        </MudButton>
+    </MudItem>
+</MudGrid>
+
+<!-- الفلاتر -->
+<MudPaper Class="pa-3 mt-3 mb-3">
+    <MudGrid AlignItems="AlignItems.Center">
+        <MudItem xs="12" md="3">
+            <MudDatePicker @bind-Date="fromDate" Label="من تاريخ" Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudDatePicker @bind-Date="toDate" Label="إلى تاريخ" Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudTextField @bind-Value="searchText" Placeholder="بحث برقم الفاتورة أو العميل..." 
+                          Variant="Variant.Outlined" Adornment="Adornment.Start" 
+                          AdornmentIcon="@Icons.Material.Filled.Search" Immediate="true" />
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="LoadData" 
+                       FullWidth="true" StartIcon="@Icons.Material.Filled.Refresh" Style="height: 56px;">
+                تحديث
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+<!-- ملخص سريع -->
+@if (sales != null && sales.Any())
+{
+    <MudGrid Class="mb-3">
+        <MudItem xs="12" md="3">
+            <MudPaper Class="pa-3 text-center" Style="background: #ecfdf5;">
+                <MudText Typo="Typo.subtitle2">عدد الفواتير</MudText>
+                <MudText Typo="Typo.h5" Color="Color.Success">@FilteredSales.Count</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudPaper Class="pa-3 text-center" Style="background: #dbeafe;">
+                <MudText Typo="Typo.subtitle2">إجمالي المبيعات</MudText>
+                <MudText Typo="Typo.h5">@FilteredSales.Sum(s => s.GrandTotal).ToString("N2") ج</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudPaper Class="pa-3 text-center" Style="background: #fef3c7;">
+                <MudText Typo="Typo.subtitle2">إجمالي الخصومات</MudText>
+                <MudText Typo="Typo.h5" Color="Color.Warning">@FilteredSales.Sum(s => s.DiscountAmount).ToString("N2") ج</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudPaper Class="pa-3 text-center" Style="background: #f0fdf4;">
+                <MudText Typo="Typo.subtitle2">إجمالي المدفوع</MudText>
+                <MudText Typo="Typo.h5" Color="Color.Success">@FilteredSales.Sum(s => s.PaidAmount).ToString("N2") ج</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+<MudPaper Class="pa-4">
+    @if (sales == null) { <MudProgressLinear Indeterminate="true" /> }
+    else if (!FilteredSales.Any()) { <MudAlert Severity="Severity.Info">لا يوجد فواتير في الفترة المحددة.</MudAlert> }
+    else
+    {
+        <MudTable Items="@FilteredSales" Hover="true" Bordered="true" Dense="true">
+            <HeaderContent>
+                <MudTh>رقم الفاتورة</MudTh>
+                <MudTh>التاريخ</MudTh>
+                <MudTh>الوقت</MudTh>
+                <MudTh>العميل</MudTh>
+                <MudTh>الكاشير</MudTh>
+                <MudTh>الفرع</MudTh>
+                <MudTh>الأصناف</MudTh>
+                <MudTh>الإجمالي</MudTh>
+                <MudTh>المدفوع</MudTh>
+                <MudTh>الدفع</MudTh>
+                <MudTh>الإجراءات</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd><strong>@context.InvoiceNumber</strong></MudTd>
+                <MudTd>@context.InvoiceDate.ToString("yyyy/MM/dd")</MudTd>
+                <MudTd>@context.InvoiceDate.ToString("HH:mm")</MudTd>
+                <MudTd>@(context.CustomerName ?? "عابر")</MudTd>
+                <MudTd>@context.CashierName</MudTd>
+                <MudTd>@context.BranchName</MudTd>
+                <MudTd>@context.ItemsCount</MudTd>
+                <MudTd><strong>@context.GrandTotal.ToString("N2")</strong></MudTd>
+                <MudTd>@context.PaidAmount.ToString("N2")</MudTd>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small" Color="@GetPaymentColor(context.PaymentMethod)">
+                        @TranslatePayment(context.PaymentMethod)
+                    </MudChip>
+                </MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" 
+                                   OnClick="@(() => ViewInvoice(context.InvoiceId))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Print" Size="Size.Small" Color="Color.Primary"
+                                   OnClick="@(() => PrintInvoice(context.InvoiceId))" />
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager />
+            </PagerContent>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private List<SaleSummaryDto>? sales;
+    private DateTime? fromDate = DateTime.Now.AddMonths(-1);
+    private DateTime? toDate = DateTime.Now;
+    private string searchText = string.Empty;
+
+    private List<SaleSummaryDto> FilteredSales => sales?.Where(s =>
+        string.IsNullOrEmpty(searchText) ||
+        s.InvoiceNumber.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+        (s.CustomerName?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false)).ToList() ?? new();
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        if (!Session.IsAuthenticated || !fromDate.HasValue || !toDate.HasValue) return;
+        sales = await SalesService.GetSalesSummaryAsync(Session.BrandId, fromDate.Value, toDate.Value.AddDays(1));
+    }
+
+    private async Task ViewInvoice(int id)
+    {
+        var parameters = new DialogParameters { ["InvoiceId"] = id };
+        await DialogService.ShowAsync<InvoiceDetailDialog>("تفاصيل الفاتورة", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+    }
+
+    [Inject] IJSRuntime JS { get; set; } = null!;
+    private async Task PrintInvoice(int id)
+    {
+        await JS.InvokeVoidAsync("open", $"/print-receipt/{id}", "_blank");
+    }
+
+    private string TranslatePayment(string method) => method switch
+    {
+        "Cash" => "كاش",
+        "Visa" => "فيزا",
+        "BankTransfer" => "تحويل",
+        _ => method
+    };
+
+    private Color GetPaymentColor(string method) => method switch
+    {
+        "Cash" => Color.Success,
+        "Visa" => Color.Info,
+        "BankTransfer" => Color.Primary,
+        _ => Color.Default
+    };
+}

@@ -1,0 +1,159 @@
+@inject IInitialStockService InitialStockService
+@inject IProductService ProductService
+@inject IBranchService BranchService
+@inject IWarehouseService WarehouseService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudAlert Severity="Severity.Info" Class="mb-3">
+            ادخل الكميات الموجودة فعلياً في المخزن. <strong>هذه العملية لن تؤثر على الخزنة.</strong>
+        </MudAlert>
+
+        <MudGrid>
+            <MudItem xs="12" md="4">
+                <MudSelect T="int" @bind-Value="model.BranchId" Label="الفرع *" Variant="Variant.Outlined">
+                    @if (branches != null)
+                    {
+                        @foreach (var b in branches)
+                        {
+                            <MudSelectItem T="int" Value="b.BranchId">@b.BranchName</MudSelectItem>
+                        }
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudSelect T="int?" @bind-Value="model.WarehouseId" Label="المخزن" Variant="Variant.Outlined">
+                    <MudSelectItem T="int?" Value="null">- بدون مخزن محدد -</MudSelectItem>
+                    @if (warehouses != null)
+                    {
+                        @foreach (var w in warehouses)
+                        {
+                            <MudSelectItem T="int?" Value="w.WarehouseId">@w.WarehouseName</MudSelectItem>
+                        }
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudDatePicker @bind-Date="entryDate" Label="التاريخ" Variant="Variant.Outlined" />
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudText Typo="Typo.h6" Class="mt-2">📦 الأصناف</MudText>
+                <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.Add" Color="Color.Primary" OnClick="AddItem">
+                    إضافة صنف
+                </MudButton>
+            </MudItem>
+
+            @for (int i = 0; i < items.Count; i++)
+            {
+                var idx = i;
+                <MudItem xs="12">
+                    <MudPaper Class="pa-2">
+                        <MudGrid>
+                            <MudItem xs="12" md="5">
+                                <MudSelect T="int" @bind-Value="items[idx].VariantId" Label="الصنف *" Variant="Variant.Outlined">
+                                    @if (products != null)
+                                    {
+                                        @foreach (var p in products)
+                                        {
+                                            @foreach (var v in p.Variants)
+                                            {
+                                                <MudSelectItem T="int" Value="v.VariantId">@(v.VariantName ?? p.ProductName)</MudSelectItem>
+                                            }
+                                        }
+                                    }
+                                </MudSelect>
+                            </MudItem>
+                            <MudItem xs="6" md="3">
+                                <MudNumericField @bind-Value="items[idx].Quantity" Label="الكمية" Variant="Variant.Outlined" Min="0" Format="N3" />
+                            </MudItem>
+                            <MudItem xs="6" md="3">
+                                <MudNumericField @bind-Value="items[idx].UnitCost" Label="التكلفة (لكل وحدة)" Variant="Variant.Outlined" Min="0" Format="N2" />
+                            </MudItem>
+                            <MudItem xs="12" md="1">
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" 
+                                               OnClick="@(() => RemoveItem(idx))" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudPaper>
+                </MudItem>
+            }
+
+            <MudItem xs="12">
+                <MudTextField @bind-Value="model.Notes" Label="ملاحظات" Variant="Variant.Outlined" Lines="2" />
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudPaper Class="pa-3" Style="background: #fef3c7;">
+                    <MudGrid>
+                        <MudItem xs="6">
+                            <MudText Typo="Typo.subtitle2">عدد الأصناف:</MudText>
+                            <MudText Typo="Typo.h6">@items.Count(i => i.VariantId > 0 && i.Quantity > 0)</MudText>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudText Typo="Typo.subtitle2">القيمة الإجمالية:</MudText>
+                            <MudText Typo="Typo.h6" Color="Color.Primary">@CalcTotal().ToString("N2") ج</MudText>
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">إلغاء</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@isSaving">
+            @if (isSaving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> }
+            else { <MudText>حفظ الرصيد الافتتاحي</MudText> }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    private CreateInitialStockRequest model = new();
+    private List<ProductDto>? products;
+    private List<BranchDto>? branches;
+    private List<WarehouseDto>? warehouses;
+    private List<InitialStockItemRequest> items = new();
+    private DateTime? entryDate = DateTime.Now;
+    private bool isSaving = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        products = await ProductService.GetProductsAsync(Session.BrandId);
+        branches = await BranchService.GetBranchesAsync(Session.BrandId);
+        warehouses = await WarehouseService.GetWarehousesAsync(Session.BrandId);
+        if (branches.Any())
+            model.BranchId = Session.CurrentBranchId > 0 ? Session.CurrentBranchId : branches.First().BranchId;
+        AddItem();
+    }
+
+    private void AddItem() => items.Add(new InitialStockItemRequest());
+    private void RemoveItem(int idx) => items.RemoveAt(idx);
+    private decimal CalcTotal() => items.Sum(i => i.Quantity * i.UnitCost);
+
+    private async Task Submit()
+    {
+        if (!items.Any(i => i.VariantId > 0 && i.Quantity > 0))
+        {
+            Snackbar.Add("ادخل صنف واحد على الأقل بكمية وتكلفة", Severity.Warning);
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            model.EntryDate = entryDate ?? DateTime.UtcNow;
+            model.Items = items.Where(i => i.VariantId > 0 && i.Quantity > 0).ToList();
+            await InitialStockService.CreateInitialStockAsync(Session.BrandId, Session.UserId, model);
+            Snackbar.Add("تم حفظ الرصيد الافتتاحي وإضافة الكميات للمخزون", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { Snackbar.Add($"خطأ: {ex.Message}", Severity.Error); }
+        finally { isSaving = false; }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

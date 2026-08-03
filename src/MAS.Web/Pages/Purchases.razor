@@ -1,0 +1,90 @@
+@page "/purchases"
+@inject IPurchaseService PurchaseService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>المشتريات - MAS</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12" Class="d-flex justify-space-between align-center">
+        <MudText Typo="Typo.h4">📥 المشتريات</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" 
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenAddDialog">
+            فاتورة شراء جديدة
+        </MudButton>
+    </MudItem>
+</MudGrid>
+
+<MudPaper Class="pa-4 mt-3">
+    @if (purchases == null)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else if (!purchases.Any())
+    {
+        <MudAlert Severity="Severity.Info">لا يوجد فواتير شراء. اضغط الزرار لإضافة أول فاتورة.</MudAlert>
+    }
+    else
+    {
+        <MudTable Items="@purchases" Hover="true" Bordered="true">
+            <HeaderContent>
+                <MudTh>رقم الفاتورة</MudTh>
+                <MudTh>النوع</MudTh>
+                <MudTh>التاريخ</MudTh>
+                <MudTh>المورد</MudTh>
+                <MudTh>الفرع</MudTh>
+                <MudTh>المخزن</MudTh>
+                <MudTh>عدد الأصناف</MudTh>
+                <MudTh>الإجمالي</MudTh>
+                <MudTh>المدفوع</MudTh>
+                <MudTh>طريقة الدفع</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.InvoiceNumber</MudTd>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small" Color="@(context.PurchaseType == "Finished" ? Color.Success : Color.Warning)">
+                        @(context.PurchaseType == "Finished" ? "📦 تامة" : "🧪 خامات")
+                    </MudChip>
+                </MudTd>
+                <MudTd>@context.InvoiceDate.ToString("yyyy/MM/dd")</MudTd>
+                <MudTd>@context.SupplierName</MudTd>
+                <MudTd>@context.BranchName</MudTd>
+                <MudTd>@context.WarehouseName</MudTd>
+                <MudTd>@context.ItemsCount</MudTd>
+                <MudTd><strong>@context.GrandTotal.ToString("N2")</strong></MudTd>
+                <MudTd>@context.PaidAmount.ToString("N2")</MudTd>
+                <MudTd>@TranslatePayment(context.PaymentMethod)</MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private List<PurchaseInvoiceDto>? purchases;
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        if (Session.IsAuthenticated)
+            purchases = await PurchaseService.GetPurchasesAsync(Session.BrandId);
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var dialog = DialogService.Show<PurchaseDialog>("فاتورة شراء جديدة",
+            new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadData();
+    }
+
+    private string TranslatePayment(string method) => method switch
+    {
+        "Cash" => "كاش",
+        "Visa" => "فيزا",
+        "BankTransfer" => "تحويل بنكي",
+        _ => method
+    };
+}

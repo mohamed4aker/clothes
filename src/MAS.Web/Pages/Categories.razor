@@ -1,0 +1,97 @@
+@page "/categories"
+@inject ICategoryService CategoryService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>التصنيفات - MAS</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12" Class="d-flex justify-space-between align-center">
+        <MudText Typo="Typo.h4">التصنيفات</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" 
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenAddDialog">
+            إضافة تصنيف
+        </MudButton>
+    </MudItem>
+</MudGrid>
+
+<MudPaper Class="pa-4 mt-3">
+    @if (categories == null)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else if (!categories.Any())
+    {
+        <MudAlert Severity="Severity.Info">لا يوجد تصنيفات.</MudAlert>
+    }
+    else
+    {
+        <MudTable Items="@categories" Hover="true" Bordered="true">
+            <HeaderContent>
+                <MudTh>الاسم</MudTh>
+                <MudTh>الاسم بالإنجليزي</MudTh>
+                <MudTh>التصنيف الأب</MudTh>
+                <MudTh>عدد المنتجات</MudTh>
+                <MudTh>الإجراءات</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.CategoryName</MudTd>
+                <MudTd>@context.CategoryNameEn</MudTd>
+                <MudTd>@context.ParentCategoryName</MudTd>
+                <MudTd>@context.ProductsCount</MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" 
+                                   OnClick="() => OpenEditDialog(context)" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                   OnClick="() => DeleteCategory(context)" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private List<CategoryDto>? categories;
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        if (Session.IsAuthenticated)
+            categories = await CategoryService.GetCategoriesAsync(Session.BrandId);
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var parameters = new DialogParameters { ["Categories"] = categories ?? new() };
+        var dialog = DialogService.Show<CategoryDialog>("إضافة تصنيف", parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadData();
+    }
+
+    private async Task OpenEditDialog(CategoryDto cat)
+    {
+        var parameters = new DialogParameters 
+        { 
+            ["Category"] = cat,
+            ["Categories"] = categories ?? new() 
+        };
+        var dialog = DialogService.Show<CategoryDialog>("تعديل تصنيف", parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadData();
+    }
+
+    private async Task DeleteCategory(CategoryDto cat)
+    {
+        var confirm = await DialogService.ShowMessageBox("تأكيد", $"حذف تصنيف {cat.CategoryName}؟",
+            yesText: "حذف", cancelText: "إلغاء");
+        if (confirm == true)
+        {
+            await CategoryService.DeleteCategoryAsync(cat.CategoryId, Session.BrandId);
+            Snackbar.Add("تم الحذف", Severity.Success);
+            await LoadData();
+        }
+    }
+}

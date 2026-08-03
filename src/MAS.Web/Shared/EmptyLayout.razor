@@ -1,0 +1,25 @@
+@inherits LayoutComponentBase
+
+<MudThemeProvider Theme="_theme" />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<div style="min-height: 100vh; background: #f9fafb;">
+    @Body
+</div>
+
+@code {
+    private MudTheme _theme = new MudTheme()
+    {
+        Palette = new PaletteLight()
+        {
+            Primary = "#92400e",
+            Secondary = "#b45309",
+            Background = "#fef3c7"
+        },
+        Typography = new Typography()
+        {
+            Default = new Default() { FontFamily = new[] { "Cairo", "sans-serif" } }
+        }
+    };
+}

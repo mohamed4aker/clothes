@@ -1,0 +1,85 @@
+@page "/brands"
+@inject IBrandService BrandService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>البراندات - MAS</PageTitle>
+
+@if (Session.Role != "Owner")
+{
+    <MudAlert Severity="Severity.Warning">هذه الصفحة متاحة للمالك فقط</MudAlert>
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12" Class="d-flex justify-space-between align-center">
+            <MudText Typo="Typo.h4">🏢 البراندات (الشركات)</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" 
+                       StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAdd">
+                إضافة براند جديد
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+
+    <MudPaper Class="pa-4 mt-3">
+        @if (brands == null) { <MudProgressLinear Indeterminate="true" /> }
+        else if (!brands.Any()) { <MudAlert Severity="Severity.Info">لا يوجد براندات.</MudAlert> }
+        else
+        {
+            <MudTable Items="@brands" Hover="true" Bordered="true">
+                <HeaderContent>
+                    <MudTh>اسم البراند</MudTh>
+                    <MudTh>النوع</MudTh>
+                    <MudTh>الهاتف</MudTh>
+                    <MudTh>الإيميل</MudTh>
+                    <MudTh>البراند الحالي</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd><strong>@context.BrandName</strong></MudTd>
+                    <MudTd>@TranslateType(context.BusinessType)</MudTd>
+                    <MudTd>@context.Phone</MudTd>
+                    <MudTd>@context.Email</MudTd>
+                    <MudTd>
+                        @if (context.BrandId == Session.BrandId)
+                        {
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small">الحالي</MudChip>
+                        }
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudPaper>
+}
+
+@code {
+    private List<BrandDto>? brands;
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        if (Session.IsAuthenticated && Session.Role == "Owner")
+        {
+            try { brands = await BrandService.GetMyBrandsAsync(Session.OwnerId); }
+            catch { brands = new List<BrandDto>(); }
+        }
+    }
+
+    private async Task OpenAdd()
+    {
+        Snackbar.Add("لإضافة براند جديد، تواصل مع MAS Software", Severity.Info);
+        await Task.CompletedTask;
+    }
+
+    private string TranslateType(string type) => type switch
+    {
+        "Clothing" => "ملابس",
+        "VeterinaryPharma" => "أدوية بيطرية",
+        "Pharmacy" => "صيدلية",
+        "Restaurant" => "مطعم",
+        "Manufacturing" => "تصنيع",
+        "Generic" => "عام",
+        _ => type
+    };
+}

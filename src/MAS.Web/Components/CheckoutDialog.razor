@@ -1,0 +1,115 @@
+@inject IOnlineOrderService OrderService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.h6" Class="mb-3">📋 ملخص الطلب</MudText>
+
+        <MudPaper Class="pa-2 mb-3" Style="background: #f9fafb;">
+            @foreach (var item in Cart)
+            {
+                <div class="d-flex justify-space-between mb-1">
+                    <MudText Typo="Typo.body2">@item.ProductName × @item.Quantity</MudText>
+                    <MudText Typo="Typo.body2"><strong>@((item.UnitPrice * item.Quantity).ToString("N2")) ج</strong></MudText>
+                </div>
+            }
+            <MudDivider Class="my-1" />
+            <div class="d-flex justify-space-between">
+                <MudText Typo="Typo.subtitle1"><strong>إجمالي الأصناف:</strong></MudText>
+                <MudText Typo="Typo.subtitle1"><strong>@SubTotal.ToString("N2") ج</strong></MudText>
+            </div>
+        </MudPaper>
+
+        <MudText Typo="Typo.h6" Class="mb-2">🚚 بيانات التوصيل</MudText>
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.CustomerName" Label="الاسم *" Variant="Variant.Outlined" Required="true" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.CustomerPhone" Label="رقم الهاتف *" Variant="Variant.Outlined" Required="true" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="model.CustomerEmail" Label="البريد الإلكتروني (اختياري)" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudSelect @bind-Value="model.City" Label="المدينة *" Variant="Variant.Outlined" Required="true">
+                    <MudSelectItem Value="@("القاهرة")">القاهرة</MudSelectItem>
+                    <MudSelectItem Value="@("الإسكندرية")">الإسكندرية</MudSelectItem>
+                    <MudSelectItem Value="@("الجيزة")">الجيزة</MudSelectItem>
+                    <MudSelectItem Value="@("دمنهور")">دمنهور</MudSelectItem>
+                    <MudSelectItem Value="@("طنطا")">طنطا</MudSelectItem>
+                    <MudSelectItem Value="@("المنصورة")">المنصورة</MudSelectItem>
+                    <MudSelectItem Value="@("أخرى")">أخرى</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudNumericField @bind-Value="customerShipping" Label="مساهمة العميل في الشحن" Variant="Variant.Outlined" />
+                <MudText Typo="Typo.caption">الشحن الكلي: @shippingCost ج (الباقي على البائع)</MudText>
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="model.ShippingAddress" Label="العنوان بالتفصيل *" Variant="Variant.Outlined" Lines="2" Required="true" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="model.Notes" Label="ملاحظات على الطلب" Variant="Variant.Outlined" Lines="2" />
+            </MudItem>
+        </MudGrid>
+
+        <MudPaper Class="pa-3 mt-3" Style="background: #ecfdf5; border: 2px solid #10b981;">
+            <div class="d-flex justify-space-between">
+                <MudText Typo="Typo.h6">المطلوب دفعه عند الاستلام:</MudText>
+                <MudText Typo="Typo.h5" Color="Color.Success">@((SubTotal + customerShipping).ToString("N2")) ج</MudText>
+            </div>
+        </MudPaper>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">إلغاء</MudButton>
+        <MudButton Color="Color.Success" Variant="Variant.Filled" Size="Size.Large" 
+                   StartIcon="@Icons.Material.Filled.Check"
+                   OnClick="Submit" Disabled="@isSaving">
+            @if (isSaving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> }
+            else { <MudText>تأكيد الطلب</MudText> }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public List<ShopCartItem> Cart { get; set; } = new();
+    [Parameter] public int BrandId { get; set; }
+
+    private CreateOnlineOrderRequest model = new();
+    private decimal shippingCost = 50;
+    private decimal customerShipping = 30;
+    private bool isSaving = false;
+
+    private decimal SubTotal => Cart.Sum(c => c.UnitPrice * c.Quantity);
+
+    private async Task Submit()
+    {
+        if (string.IsNullOrWhiteSpace(model.CustomerName) || string.IsNullOrWhiteSpace(model.CustomerPhone) ||
+            string.IsNullOrWhiteSpace(model.City) || string.IsNullOrWhiteSpace(model.ShippingAddress))
+        {
+            Snackbar.Add("املا كل البيانات المطلوبة", Severity.Warning);
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            model.ShippingCost = shippingCost;
+            model.CustomerShippingShare = customerShipping;
+            model.Items = Cart.Select(c => new OnlineOrderItemRequest
+            {
+                VariantId = c.VariantId,
+                Quantity = c.Quantity
+            }).ToList();
+
+            await OrderService.CreateOrderAsync(BrandId, model);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { Snackbar.Add($"خطأ: {ex.Message}", Severity.Error); }
+        finally { isSaving = false; }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

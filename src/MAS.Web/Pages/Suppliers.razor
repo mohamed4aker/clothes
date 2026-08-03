@@ -1,0 +1,100 @@
+@page "/suppliers"
+@inject ISupplierService SupplierService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>الموردين - MAS</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12" Class="d-flex justify-space-between align-center">
+        <MudText Typo="Typo.h4">🏭 الموردين</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAdd">
+            إضافة مورد
+        </MudButton>
+    </MudItem>
+</MudGrid>
+
+<MudPaper Class="pa-4 mt-3">
+    @if (suppliers == null) { <MudProgressLinear Indeterminate="true" /> }
+    else if (!suppliers.Any()) { <MudAlert Severity="Severity.Info">لا يوجد موردين بعد. ابدأ بإضافة أول مورد.</MudAlert> }
+    else
+    {
+        <MudTextField @bind-Value="searchText" Placeholder="بحث..." Adornment="Adornment.Start" 
+                      AdornmentIcon="@Icons.Material.Filled.Search" Immediate="true" Class="mb-2" />
+
+        <MudTable Items="@FilteredList" Hover="true" Bordered="true">
+            <HeaderContent>
+                <MudTh>الاسم</MudTh>
+                <MudTh>الشركة</MudTh>
+                <MudTh>الهاتف</MudTh>
+                <MudTh>العنوان</MudTh>
+                <MudTh>الرصيد الحالي</MudTh>
+                <MudTh>إجمالي المشتريات</MudTh>
+                <MudTh>الإجراءات</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd><strong>@context.SupplierName</strong></MudTd>
+                <MudTd>@context.CompanyName</MudTd>
+                <MudTd>@context.Phone</MudTd>
+                <MudTd>@context.Address</MudTd>
+                <MudTd>
+                    <span style="color: @(context.CurrentBalance >= 0 ? "green" : "red");">
+                        @context.CurrentBalance.ToString("N2")
+                    </span>
+                </MudTd>
+                <MudTd>@context.TotalPurchases.ToString("N2")</MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => OpenEdit(context))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => Delete(context))" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private List<SupplierDto>? suppliers;
+    private string searchText = string.Empty;
+
+    private List<SupplierDto> FilteredList => suppliers?.Where(s =>
+        string.IsNullOrEmpty(searchText) ||
+        s.SupplierName.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+        (s.Phone?.Contains(searchText) ?? false) ||
+        (s.CompanyName?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false)).ToList() ?? new();
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        if (Session.IsAuthenticated)
+            suppliers = await SupplierService.GetSuppliersAsync(Session.BrandId);
+    }
+
+    private async Task OpenAdd()
+    {
+        var dialog = DialogService.Show<SupplierDialog>("إضافة مورد", new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadData();
+    }
+
+    private async Task OpenEdit(SupplierDto s)
+    {
+        var parameters = new DialogParameters { ["Supplier"] = s };
+        var dialog = DialogService.Show<SupplierDialog>("تعديل المورد", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadData();
+    }
+
+    private async Task Delete(SupplierDto s)
+    {
+        var confirm = await DialogService.ShowMessageBox("تأكيد", $"حذف {s.SupplierName}؟", yesText: "حذف", cancelText: "إلغاء");
+        if (confirm == true)
+        {
+            await SupplierService.DeleteSupplierAsync(s.SupplierId, Session.BrandId);
+            Snackbar.Add("تم الحذف", Severity.Success);
+            await LoadData();
+        }
+    }
+}

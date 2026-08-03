@@ -1,0 +1,216 @@
+@page "/reports"
+@inject IReportsService ReportsService
+@inject UserSession Session
+
+<PageTitle>التقارير - MAS</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">📈 التقارير</MudText>
+
+<MudTabs Elevation="2" Rounded="true" PanelClass="pa-4">
+    <MudTabPanel Text="تقرير المبيعات">
+        <MudGrid Class="mb-3">
+            <MudItem xs="12" md="4">
+                <MudDatePicker @bind-Date="fromDate" Label="من تاريخ" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudDatePicker @bind-Date="toDate" Label="إلى تاريخ" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="LoadSalesReport" FullWidth="true" Style="height: 56px;">
+                    عرض التقرير
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+
+        @if (isLoadingSales) { <MudProgressLinear Indeterminate="true" /> }
+        else if (salesReport != null)
+        {
+            <MudGrid>
+                <MudItem xs="12" md="3">
+                    <MudPaper Class="pa-3 text-center" Style="background: #ecfdf5;">
+                        <MudText Typo="Typo.subtitle2">إجمالي المبيعات</MudText>
+                        <MudText Typo="Typo.h5" Color="Color.Success">@salesReport.TotalSales.ToString("N2") ج</MudText>
+                        <MudText Typo="Typo.caption">@salesReport.InvoicesCount فاتورة</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudPaper Class="pa-3 text-center" Style="background: #fef3c7;">
+                        <MudText Typo="Typo.subtitle2">تكلفة البضاعة</MudText>
+                        <MudText Typo="Typo.h5">@salesReport.TotalCOGS.ToString("N2") ج</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudPaper Class="pa-3 text-center" Style="background: #dbeafe;">
+                        <MudText Typo="Typo.subtitle2">الخصومات</MudText>
+                        <MudText Typo="Typo.h5">@salesReport.TotalDiscounts.ToString("N2") ج</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudPaper Class="pa-3 text-center" Style="background: #f0fdfa; border: 2px solid #92400e;">
+                        <MudText Typo="Typo.subtitle2">الربح الإجمالي</MudText>
+                        <MudText Typo="Typo.h5" Color="Color.Primary">@salesReport.GrossProfit.ToString("N2") ج</MudText>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+
+            @if (salesReport.DailySales.Any())
+            {
+                <MudPaper Class="pa-3 mt-3">
+                    <MudText Typo="Typo.h6" Class="mb-2">📅 المبيعات اليومية</MudText>
+                    <MudTable Items="@salesReport.DailySales" Dense="true">
+                        <HeaderContent>
+                            <MudTh>التاريخ</MudTh>
+                            <MudTh>عدد الفواتير</MudTh>
+                            <MudTh>الإجمالي</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.Date.ToString("yyyy/MM/dd")</MudTd>
+                            <MudTd>@context.InvoicesCount</MudTd>
+                            <MudTd>@context.Sales.ToString("N2") ج</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudPaper>
+            }
+
+            @if (salesReport.TopProducts.Any())
+            {
+                <MudPaper Class="pa-3 mt-3">
+                    <MudText Typo="Typo.h6" Class="mb-2">🏆 أكثر المنتجات مبيعاً</MudText>
+                    <MudTable Items="@salesReport.TopProducts" Dense="true">
+                        <HeaderContent>
+                            <MudTh>المنتج</MudTh>
+                            <MudTh>الكمية</MudTh>
+                            <MudTh>الإيرادات</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.ProductName</MudTd>
+                            <MudTd>@context.QuantitySold</MudTd>
+                            <MudTd>@context.Revenue.ToString("N2") ج</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudPaper>
+            }
+
+            @if (salesReport.TopCustomers.Any())
+            {
+                <MudPaper Class="pa-3 mt-3">
+                    <MudText Typo="Typo.h6" Class="mb-2">⭐ أفضل العملاء</MudText>
+                    <MudTable Items="@salesReport.TopCustomers" Dense="true">
+                        <HeaderContent>
+                            <MudTh>العميل</MudTh>
+                            <MudTh>عدد الفواتير</MudTh>
+                            <MudTh>إجمالي المشتريات</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.CustomerName</MudTd>
+                            <MudTd>@context.InvoicesCount</MudTd>
+                            <MudTd>@context.TotalSpent.ToString("N2") ج</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudPaper>
+            }
+        }
+    </MudTabPanel>
+
+    <MudTabPanel Text="تقرير المخزون">
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="LoadInventoryReport" Class="mb-3" StartIcon="@Icons.Material.Filled.Refresh">
+            تحديث التقرير
+        </MudButton>
+
+        @if (isLoadingInv) { <MudProgressLinear Indeterminate="true" /> }
+        else if (invReport != null)
+        {
+            <MudGrid>
+                <MudItem xs="12" md="3">
+                    <MudPaper Class="pa-3 text-center" Style="background: #ecfdf5;">
+                        <MudText Typo="Typo.subtitle2">قيمة المخزون</MudText>
+                        <MudText Typo="Typo.h5" Color="Color.Success">@invReport.TotalValue.ToString("N2") ج</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudPaper Class="pa-3 text-center" Style="background: #dbeafe;">
+                        <MudText Typo="Typo.subtitle2">إجمالي الأصناف</MudText>
+                        <MudText Typo="Typo.h5">@invReport.TotalProducts</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudPaper Class="pa-3 text-center" Style="background: #fef3c7;">
+                        <MudText Typo="Typo.subtitle2">منخفضة المخزون</MudText>
+                        <MudText Typo="Typo.h5" Color="Color.Warning">@invReport.LowStockCount</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudPaper Class="pa-3 text-center" Style="background: #fee2e2;">
+                        <MudText Typo="Typo.subtitle2">منتهية</MudText>
+                        <MudText Typo="Typo.h5" Color="Color.Error">@invReport.OutOfStockCount</MudText>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+
+            <MudPaper Class="pa-3 mt-3">
+                <MudTable Items="@invReport.Items" Hover="true" Dense="true" Bordered="true">
+                    <HeaderContent>
+                        <MudTh>المنتج</MudTh>
+                        <MudTh>الكود</MudTh>
+                        <MudTh>الفرع</MudTh>
+                        <MudTh>الكمية</MudTh>
+                        <MudTh>متوسط التكلفة</MudTh>
+                        <MudTh>سعر البيع</MudTh>
+                        <MudTh>قيمة المخزون</MudTh>
+                        <MudTh>الحالة</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.ProductName</MudTd>
+                        <MudTd>@context.SKU</MudTd>
+                        <MudTd>@context.BranchName</MudTd>
+                        <MudTd>@context.Quantity</MudTd>
+                        <MudTd>@context.AverageCost.ToString("N2")</MudTd>
+                        <MudTd>@context.SellingPrice.ToString("N2")</MudTd>
+                        <MudTd><strong>@context.TotalValue.ToString("N2")</strong></MudTd>
+                        <MudTd>
+                            <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)">@context.Status</MudChip>
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            </MudPaper>
+        }
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    private DateTime? fromDate = DateTime.Now.AddDays(-30);
+    private DateTime? toDate = DateTime.Now;
+    private SalesReportDto? salesReport;
+    private InventoryReportDto? invReport;
+    private bool isLoadingSales = false;
+    private bool isLoadingInv = false;
+
+    private async Task LoadSalesReport()
+    {
+        if (!fromDate.HasValue || !toDate.HasValue) return;
+        isLoadingSales = true;
+        try
+        {
+            salesReport = await ReportsService.GetSalesReportAsync(Session.BrandId, fromDate.Value, toDate.Value.AddDays(1));
+        }
+        finally { isLoadingSales = false; }
+    }
+
+    private async Task LoadInventoryReport()
+    {
+        isLoadingInv = true;
+        try
+        {
+            invReport = await ReportsService.GetInventoryReportAsync(Session.BrandId);
+        }
+        finally { isLoadingInv = false; }
+    }
+
+    private Color GetStatusColor(string status) => status switch
+    {
+        "متوفر" => Color.Success,
+        "منخفض" => Color.Warning,
+        "نفذ" => Color.Error,
+        _ => Color.Default
+    };
+}

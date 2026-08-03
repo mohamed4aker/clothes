@@ -1,0 +1,190 @@
+@inject IPurchaseReturnService ReturnService
+@inject IProductService ProductService
+@inject IBranchService BranchService
+@inject ISupplierService SupplierService
+@inject IWarehouseService WarehouseService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12" md="4">
+                <MudSelect T="int" @bind-Value="model.BranchId" Label="الفرع *" Variant="Variant.Outlined">
+                    @if (branches != null)
+                    {
+                        @foreach (var b in branches)
+                        {
+                            <MudSelectItem T="int" Value="b.BranchId">@b.BranchName</MudSelectItem>
+                        }
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudSelect T="int?" @bind-Value="model.SupplierId" Label="المورد" Variant="Variant.Outlined">
+                    <MudSelectItem T="int?" Value="null">- بدون -</MudSelectItem>
+                    @if (suppliers != null)
+                    {
+                        @foreach (var s in suppliers)
+                        {
+                            <MudSelectItem T="int?" Value="s.SupplierId">@s.SupplierName</MudSelectItem>
+                        }
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudSelect T="int?" @bind-Value="model.WarehouseId" Label="المخزن" Variant="Variant.Outlined">
+                    <MudSelectItem T="int?" Value="null">- بدون -</MudSelectItem>
+                    @if (warehouses != null)
+                    {
+                        @foreach (var w in warehouses)
+                        {
+                            <MudSelectItem T="int?" Value="w.WarehouseId">@w.WarehouseName</MudSelectItem>
+                        }
+                    }
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudTextField @bind-Value="model.Reason" Label="سبب المرتجع *" 
+                              Variant="Variant.Outlined" Required="true"
+                              HelperText="مثل: تالف، خطأ في الطلب، انتهاء صلاحية، إلخ" />
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudText Typo="Typo.h6" Class="mt-2">📦 الأصناف المرتجعة</MudText>
+                <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.Add" Color="Color.Primary" OnClick="AddItem">
+                    إضافة صنف
+                </MudButton>
+            </MudItem>
+
+            @for (int i = 0; i < items.Count; i++)
+            {
+                var idx = i;
+                <MudItem xs="12">
+                    <MudPaper Class="pa-2">
+                        <MudGrid>
+                            <MudItem xs="12" md="5">
+                                <MudSelect T="int" @bind-Value="items[idx].VariantId" Label="الصنف *" Variant="Variant.Outlined">
+                                    @if (products != null)
+                                    {
+                                        @foreach (var p in products)
+                                        {
+                                            @foreach (var v in p.Variants)
+                                            {
+                                                <MudSelectItem T="int" Value="v.VariantId">@(v.VariantName ?? p.ProductName)</MudSelectItem>
+                                            }
+                                        }
+                                    }
+                                </MudSelect>
+                            </MudItem>
+                            <MudItem xs="6" md="3">
+                                <MudNumericField @bind-Value="items[idx].Quantity" Label="الكمية" Variant="Variant.Outlined" Min="0" Format="N3" />
+                            </MudItem>
+                            <MudItem xs="6" md="3">
+                                <MudNumericField @bind-Value="items[idx].UnitCost" Label="سعر الوحدة" Variant="Variant.Outlined" Min="0" Format="N2" />
+                            </MudItem>
+                            <MudItem xs="12" md="1">
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" 
+                                               OnClick="@(() => RemoveItem(idx))" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudPaper>
+                </MudItem>
+            }
+
+            <MudItem xs="12" md="6">
+                <MudNumericField @bind-Value="model.RefundAmount" Label="المبلغ المسترد *" 
+                                 Variant="Variant.Outlined" Min="0" Format="N2" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudSelect @bind-Value="model.RefundMethod" Label="طريقة الاسترداد" Variant="Variant.Outlined">
+                    <MudSelectItem Value="@("Cash")">كاش (من الخزنة)</MudSelectItem>
+                    <MudSelectItem Value="@("Visa")">فيزا</MudSelectItem>
+                    <MudSelectItem Value="@("Credit")">خصم من حساب المورد</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudTextField @bind-Value="model.Notes" Label="ملاحظات" Variant="Variant.Outlined" Lines="2" />
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudPaper Class="pa-3" Style="background: #fef3c7;">
+                    <MudGrid>
+                        <MudItem xs="6">
+                            <MudText Typo="Typo.subtitle2">إجمالي قيمة المرتجع:</MudText>
+                            <MudText Typo="Typo.h6">@CalcSubTotal().ToString("N2") ج</MudText>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudText Typo="Typo.subtitle2">المبلغ المسترد:</MudText>
+                            <MudText Typo="Typo.h6" Color="Color.Success">@model.RefundAmount.ToString("N2") ج</MudText>
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">إلغاء</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@isSaving">
+            @if (isSaving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> }
+            else { <MudText>حفظ المرتجع</MudText> }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    private CreatePurchaseReturnRequest model = new() { RefundMethod = "Cash" };
+    private List<ProductDto>? products;
+    private List<BranchDto>? branches;
+    private List<SupplierDto>? suppliers;
+    private List<WarehouseDto>? warehouses;
+    private List<PurchaseReturnItemRequest> items = new();
+    private bool isSaving = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        products = await ProductService.GetProductsAsync(Session.BrandId);
+        branches = await BranchService.GetBranchesAsync(Session.BrandId);
+        suppliers = await SupplierService.GetSuppliersAsync(Session.BrandId);
+        warehouses = await WarehouseService.GetWarehousesAsync(Session.BrandId);
+        if (branches.Any())
+            model.BranchId = Session.CurrentBranchId > 0 ? Session.CurrentBranchId : branches.First().BranchId;
+        AddItem();
+    }
+
+    private void AddItem() => items.Add(new PurchaseReturnItemRequest());
+    private void RemoveItem(int idx) => items.RemoveAt(idx);
+    private decimal CalcSubTotal() => items.Sum(i => i.Quantity * i.UnitCost);
+
+    private async Task Submit()
+    {
+        if (string.IsNullOrWhiteSpace(model.Reason))
+        {
+            Snackbar.Add("ادخل سبب المرتجع", Severity.Warning);
+            return;
+        }
+        if (!items.Any(i => i.VariantId > 0 && i.Quantity > 0))
+        {
+            Snackbar.Add("ادخل صنف واحد على الأقل", Severity.Warning);
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            model.Items = items.Where(i => i.VariantId > 0 && i.Quantity > 0).ToList();
+            await ReturnService.CreateReturnAsync(Session.BrandId, Session.UserId, model);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطأ: {ex.Message}", Severity.Error);
+        }
+        finally { isSaving = false; }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

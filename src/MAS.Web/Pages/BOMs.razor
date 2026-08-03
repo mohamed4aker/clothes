@@ -1,0 +1,122 @@
+@page "/manufacturing/boms"
+@inject IManufacturingService ManufacturingService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>وصفات التصنيع - MAS</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12" Class="d-flex justify-space-between align-center">
+        <MudText Typo="Typo.h4">🏭 وصفات التصنيع (BOM)</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" 
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenAddDialog">
+            إضافة وصفة جديدة
+        </MudButton>
+    </MudItem>
+</MudGrid>
+
+<MudPaper Class="pa-4 mt-3">
+    @if (boms == null)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else if (!boms.Any())
+    {
+        <MudAlert Severity="Severity.Info">
+            لا يوجد وصفات بعد. اضغط "إضافة وصفة جديدة" لإنشاء أول وصفة تصنيع.
+        </MudAlert>
+    }
+    else
+    {
+        <MudTable Items="@boms" Hover="true" Bordered="true">
+            <HeaderContent>
+                <MudTh>اسم الوصفة</MudTh>
+                <MudTh>المنتج</MudTh>
+                <MudTh>عدد الخامات</MudTh>
+                <MudTh>تكلفة الخامات</MudTh>
+                <MudTh>التكلفة الكلية</MudTh>
+                <MudTh>السعر المقترح</MudTh>
+                <MudTh>الإجراءات</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.BomName</MudTd>
+                <MudTd>@context.ProductName</MudTd>
+                <MudTd>@context.Items.Count</MudTd>
+                <MudTd>@context.TotalMaterialsCost.ToString("N2") ج</MudTd>
+                <MudTd><strong>@context.TotalCost.ToString("N2") ج</strong></MudTd>
+                <MudTd>@context.SuggestedSellingPrice.ToString("N2") ج</MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Calculate" Size="Size.Small" Color="Color.Info"
+                                   Title="حاسبة الإنتاج"
+                                   OnClick="() => OpenCalculator(context)" />
+                    <MudIconButton Icon="@Icons.Material.Filled.PlayArrow" Size="Size.Small" Color="Color.Success"
+                                   Title="بدء إنتاج"
+                                   OnClick="() => StartProduction(context)" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                   OnClick="() => OpenEditDialog(context)" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                   OnClick="() => DeleteBom(context)" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private List<BomDto>? boms;
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        if (Session.IsAuthenticated)
+            boms = await ManufacturingService.GetBomsAsync(Session.BrandId);
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var dialog = DialogService.Show<BomDialog>("إضافة وصفة", 
+            new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadData();
+    }
+
+    private async Task OpenEditDialog(BomDto bom)
+    {
+        var parameters = new DialogParameters { ["Bom"] = bom };
+        var dialog = DialogService.Show<BomDialog>("تعديل الوصفة", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadData();
+    }
+
+    private async Task OpenCalculator(BomDto bom)
+    {
+        var parameters = new DialogParameters { ["BomId"] = bom.BomId, ["ProductName"] = bom.ProductName };
+        await DialogService.ShowAsync<CapacityCalculatorDialog>("حاسبة الإنتاج", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+    }
+
+    private async Task StartProduction(BomDto bom)
+    {
+        var parameters = new DialogParameters { ["Bom"] = bom };
+        var dialog = DialogService.Show<StartProductionDialog>("بدء أمر إنتاج", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled) Snackbar.Add("تم بدء أمر الإنتاج", Severity.Success);
+    }
+
+    private async Task DeleteBom(BomDto bom)
+    {
+        var confirm = await DialogService.ShowMessageBox("تأكيد", $"حذف الوصفة {bom.BomName}؟",
+            yesText: "حذف", cancelText: "إلغاء");
+        if (confirm == true)
+        {
+            await ManufacturingService.DeleteBomAsync(bom.BomId, Session.BrandId);
+            Snackbar.Add("تم الحذف", Severity.Success);
+            await LoadData();
+        }
+    }
+}

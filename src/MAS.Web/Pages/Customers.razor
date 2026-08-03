@@ -1,0 +1,123 @@
+@page "/customers"
+@inject ICustomerService CustomerService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>العملاء - MAS</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12" Class="d-flex justify-space-between align-center">
+        <MudText Typo="Typo.h4">العملاء</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" 
+                   StartIcon="@Icons.Material.Filled.PersonAdd"
+                   OnClick="OpenAddDialog">
+            إضافة عميل
+        </MudButton>
+    </MudItem>
+</MudGrid>
+
+<MudPaper Class="pa-4 mt-3">
+    <MudTextField @bind-Value="searchText" Placeholder="بحث بالاسم أو الهاتف..." 
+                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                  Immediate="true" Class="mb-3" />
+
+    @if (customers == null)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else if (!FilteredCustomers.Any())
+    {
+        <MudAlert Severity="Severity.Info">لا يوجد عملاء. اضغط "إضافة عميل" لإضافة عميل جديد.</MudAlert>
+    }
+    else
+    {
+        <MudTable Items="@FilteredCustomers" Hover="true" Bordered="true">
+            <HeaderContent>
+                <MudTh>الكود</MudTh>
+                <MudTh>الاسم</MudTh>
+                <MudTh>الهاتف</MudTh>
+                <MudTh>النوع</MudTh>
+                <MudTh>إجمالي المشتريات</MudTh>
+                <MudTh>النقاط</MudTh>
+                <MudTh>الإجراءات</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.CustomerCode</MudTd>
+                <MudTd>@context.FullName</MudTd>
+                <MudTd>@context.Phone</MudTd>
+                <MudTd>@TranslateType(context.CustomerType)</MudTd>
+                <MudTd>@context.TotalSpent.ToString("N2")</MudTd>
+                <MudTd>@context.LoyaltyPoints</MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" 
+                                   OnClick="() => OpenEditDialog(context)" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                   OnClick="() => DeleteCustomer(context)" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private List<CustomerDto>? customers;
+    private string searchText = string.Empty;
+
+    private List<CustomerDto> FilteredCustomers =>
+        customers?.Where(c =>
+            string.IsNullOrEmpty(searchText) ||
+            c.FullName.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+            (c.Phone?.Contains(searchText) ?? false)
+        ).ToList() ?? new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCustomers();
+    }
+
+    private async Task LoadCustomers()
+    {
+        if (Session.IsAuthenticated)
+            customers = await CustomerService.GetCustomersAsync(Session.BrandId);
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var parameters = new DialogParameters();
+        var dialog = DialogService.Show<CustomerDialog>("إضافة عميل جديد", parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled)
+            await LoadCustomers();
+    }
+
+    private async Task OpenEditDialog(CustomerDto customer)
+    {
+        var parameters = new DialogParameters { ["Customer"] = customer };
+        var dialog = DialogService.Show<CustomerDialog>("تعديل العميل", parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled)
+            await LoadCustomers();
+    }
+
+    private async Task DeleteCustomer(CustomerDto customer)
+    {
+        var confirm = await DialogService.ShowMessageBox("تأكيد", $"هل تريد حذف العميل {customer.FullName}؟", 
+            yesText: "حذف", cancelText: "إلغاء");
+        if (confirm == true)
+        {
+            await CustomerService.DeleteCustomerAsync(customer.CustomerId, Session.BrandId);
+            Snackbar.Add("تم الحذف", Severity.Success);
+            await LoadCustomers();
+        }
+    }
+
+    private string TranslateType(string type) => type switch
+    {
+        "Retail" => "تجزئة",
+        "Wholesale" => "جملة",
+        "VIP" => "VIP",
+        "B2B" => "شركات",
+        _ => type
+    };
+}

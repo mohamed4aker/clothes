@@ -1,0 +1,117 @@
+@page "/manufacturing/orders"
+@inject IManufacturingService ManufacturingService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>أوامر الإنتاج - MAS</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">🏭 أوامر الإنتاج</MudText>
+
+<MudPaper Class="pa-4">
+    @if (orders == null)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else if (!orders.Any())
+    {
+        <MudAlert Severity="Severity.Info">لا يوجد أوامر إنتاج. ابدأ من شاشة الوصفات.</MudAlert>
+    }
+    else
+    {
+        <MudTable Items="@orders" Hover="true" Bordered="true">
+            <HeaderContent>
+                <MudTh>رقم الأمر</MudTh>
+                <MudTh>المنتج</MudTh>
+                <MudTh>الفرع</MudTh>
+                <MudTh>الكمية المخططة</MudTh>
+                <MudTh>الكمية الفعلية</MudTh>
+                <MudTh>الهالك</MudTh>
+                <MudTh>التكلفة الكلية</MudTh>
+                <MudTh>تكلفة الوحدة</MudTh>
+                <MudTh>الحالة</MudTh>
+                <MudTh>الإجراءات</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.OrderNumber</MudTd>
+                <MudTd>@context.ProductName</MudTd>
+                <MudTd>@context.BranchName</MudTd>
+                <MudTd>@context.PlannedQuantity</MudTd>
+                <MudTd>@(context.ActualQuantity?.ToString("N0") ?? "-")</MudTd>
+                <MudTd>@context.WasteQuantity</MudTd>
+                <MudTd>@context.TotalProductionCost.ToString("N2")</MudTd>
+                <MudTd>@context.UnitProductionCost.ToString("N2")</MudTd>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)">@TranslateStatus(context.Status)</MudChip>
+                </MudTd>
+                <MudTd>
+                    @if (context.Status == "Draft" || context.Status == "InProgress")
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small"
+                                       Title="إكمال الإنتاج" OnClick="() => CompleteOrder(context)" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Cancel" Color="Color.Error" Size="Size.Small"
+                                       Title="إلغاء" OnClick="() => CancelOrder(context)" />
+                    }
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private List<ProductionOrderDto>? orders;
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        if (Session.IsAuthenticated)
+            orders = await ManufacturingService.GetProductionOrdersAsync(Session.BrandId);
+    }
+
+    private async Task CompleteOrder(ProductionOrderDto order)
+    {
+        var parameters = new DialogParameters { ["Order"] = order };
+        var dialog = DialogService.Show<CompleteProductionDialog>("إكمال الإنتاج", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadData();
+    }
+
+    private async Task CancelOrder(ProductionOrderDto order)
+    {
+        var confirm = await DialogService.ShowMessageBox("تأكيد", $"إلغاء أمر الإنتاج {order.OrderNumber}؟",
+            yesText: "إلغاء الأمر", cancelText: "تراجع");
+        if (confirm == true)
+        {
+            try
+            {
+                await ManufacturingService.CancelProductionOrderAsync(order.ProductionOrderId, Session.BrandId);
+                Snackbar.Add("تم الإلغاء", Severity.Success);
+                await LoadData();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"خطأ: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private Color GetStatusColor(string status) => status switch
+    {
+        "Draft" => Color.Default,
+        "InProgress" => Color.Info,
+        "Completed" => Color.Success,
+        "Cancelled" => Color.Error,
+        _ => Color.Default
+    };
+
+    private string TranslateStatus(string status) => status switch
+    {
+        "Draft" => "جديد",
+        "InProgress" => "جاري",
+        "Completed" => "مكتمل",
+        "Cancelled" => "ملغي",
+        _ => status
+    };
+}

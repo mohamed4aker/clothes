@@ -1,0 +1,189 @@
+@page "/print-receipt/{InvoiceId:int}"
+@layout EmptyLayout
+@inject ISalesService SalesService
+@inject IBrandSettingsService SettingsService
+@inject UserSession Session
+@inject IJSRuntime JS
+
+<style>
+    @@media print {
+        body { margin: 0; padding: 0; }
+        .no-print { display: none !important; }
+        .receipt { width: 80mm; max-width: 80mm; }
+    }
+    .receipt {
+        font-family: 'Courier New', monospace;
+        max-width: 80mm;
+        margin: 0 auto;
+        padding: 10px;
+        background: white;
+        font-size: 12px;
+    }
+    .receipt h2, .receipt h3 { text-align: center; margin: 4px 0; }
+    .receipt table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+    .receipt th, .receipt td { padding: 2px 4px; text-align: right; border-bottom: 1px dashed #ccc; }
+    .receipt .total-row { border-top: 2px solid #000; font-weight: bold; font-size: 14px; }
+    .receipt .center { text-align: center; }
+</style>
+
+@if (invoice == null)
+{
+    <div style="padding: 20px; text-align: center;">جاري التحميل...</div>
+}
+else
+{
+    <div class="no-print" style="padding: 10px; background: #f3f4f6; text-align: center;">
+        <button onclick="window.print()" style="padding: 8px 20px; background: #92400e; color: white; border: none; cursor: pointer; font-size: 16px;">
+            🖨️ طباعة
+        </button>
+        <button onclick="window.close()" style="padding: 8px 20px; background: #6b7280; color: white; border: none; cursor: pointer; font-size: 16px; margin-right: 10px;">
+            إغلاق
+        </button>
+    </div>
+
+    <div class="receipt">
+        @if (!string.IsNullOrEmpty(settings?.ReceiptHeader))
+        {
+            <h3>@settings.ReceiptHeader</h3>
+        }
+        <h2>فاتورة مبيعات</h2>
+        <p class="center">
+            رقم: @invoice.InvoiceNumber<br/>
+            التاريخ: @invoice.CreatedAt.ToString("yyyy/MM/dd HH:mm")
+        </p>
+        
+        <hr/>
+        
+        <p>
+            <strong>الفرع:</strong> @invoice.BranchName<br/>
+            <strong>الكاشير:</strong> @invoice.CashierName<br/>
+            @if (!string.IsNullOrEmpty(invoice.CustomerName))
+            {
+                <text><strong>العميل:</strong> @invoice.CustomerName</text>
+            }
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>الصنف</th>
+                    <th>كمية</th>
+                    <th>سعر</th>
+                    <th>إجمالي</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in invoice.Items)
+                {
+                    <tr>
+                        <td>@item.ProductName</td>
+                        <td>@item.Quantity</td>
+                        <td>@item.UnitPrice.ToString("N2")</td>
+                        <td>@item.LineTotal.ToString("N2")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <table>
+            <tr>
+                <td>الإجمالي:</td>
+                <td style="text-align: left;">@invoice.SubTotal.ToString("N2") ج</td>
+            </tr>
+            @if (invoice.DiscountAmount > 0)
+            {
+                <tr>
+                    <td>الخصم:</td>
+                    <td style="text-align: left;">-@invoice.DiscountAmount.ToString("N2") ج</td>
+                </tr>
+            }
+            @if (invoice.TaxAmount > 0)
+            {
+                <tr>
+                    <td>الضريبة:</td>
+                    <td style="text-align: left;">@invoice.TaxAmount.ToString("N2") ج</td>
+                </tr>
+            }
+            <tr class="total-row">
+                <td>الإجمالي الكلي:</td>
+                <td style="text-align: left;">@invoice.GrandTotal.ToString("N2") ج</td>
+            </tr>
+            <tr>
+                <td>المدفوع:</td>
+                <td style="text-align: left;">@invoice.PaidAmount.ToString("N2") ج</td>
+            </tr>
+            @if (invoice.ChangeAmount > 0)
+            {
+                <tr>
+                    <td>الباقي:</td>
+                    <td style="text-align: left;">@invoice.ChangeAmount.ToString("N2") ج</td>
+                </tr>
+            }
+        </table>
+
+        <hr/>
+        
+        @if (!string.IsNullOrEmpty(settings?.ReceiptFooter))
+        {
+            <p class="center"><strong>@settings.ReceiptFooter</strong></p>
+        }
+        else
+        {
+            <p class="center"><strong>شكراً لتعاملكم معنا</strong></p>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public int InvoiceId { get; set; }
+    private SaleDetailDto? invoice;
+    private BrandSettingsDto? settings;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // لو في session فعالة استخدم الـ BrandId منها
+        var brandId = Session.BrandId;
+        
+        // لو مفيش، نحاول نجيب الفاتورة بطريقة مرنة (هتفشل لو brandId = 0 - أوكي)
+        if (brandId > 0)
+        {
+            invoice = await SalesService.GetSaleDetailsAsync(InvoiceId, brandId);
+            settings = await SettingsService.GetSettingsAsync(brandId);
+        }
+        else
+        {
+            // البديل: ابحث في كل البراندات (للحالة اللي الـ window فتحت بدون session)
+            invoice = await GetInvoiceByIdAnyBrand();
+            if (invoice != null)
+            {
+                settings = await SettingsService.GetSettingsAsync(0); // ترجع defaults
+            }
+        }
+    }
+
+    private async Task<SaleDetailDto?> GetInvoiceByIdAnyBrand()
+    {
+        // محاولة جلب الفاتورة من أي براند (للطباعة فقط)
+        // البحث في البراندات الفعالة
+        for (int brandId = 1; brandId <= 10; brandId++)
+        {
+            try
+            {
+                var inv = await SalesService.GetSaleDetailsAsync(InvoiceId, brandId);
+                if (inv != null) return inv;
+            }
+            catch { }
+        }
+        return null;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && invoice != null)
+        {
+            // طباعة تلقائية بعد التحميل
+            await Task.Delay(500);
+            await JS.InvokeVoidAsync("eval", "setTimeout(function(){ window.print(); }, 300);");
+        }
+    }
+}

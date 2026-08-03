@@ -1,0 +1,91 @@
+@page "/stock-report"
+@inject IReportsService ReportsService
+@inject UserSession Session
+
+<PageTitle>مخزون الأصناف - MAS</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">📦 مخزون الأصناف</MudText>
+
+<MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Refresh" OnClick="LoadData" Class="mb-3">
+    تحديث
+</MudButton>
+
+@if (loading) { <MudProgressLinear Indeterminate="true" /> }
+else if (report != null)
+{
+    <MudGrid Class="mb-3">
+        <MudItem xs="12" md="3">
+            <MudPaper Class="pa-3 text-center" Style="background: #ecfdf5;">
+                <MudText Typo="Typo.subtitle2">قيمة المخزون</MudText>
+                <MudText Typo="Typo.h5" Color="Color.Success">@report.TotalValue.ToString("N2") ج</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudPaper Class="pa-3 text-center" Style="background: #dbeafe;">
+                <MudText Typo="Typo.subtitle2">إجمالي الأصناف</MudText>
+                <MudText Typo="Typo.h5">@report.TotalProducts</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudPaper Class="pa-3 text-center" Style="background: #fef3c7;">
+                <MudText Typo="Typo.subtitle2">منخفض المخزون</MudText>
+                <MudText Typo="Typo.h5" Color="Color.Warning">@report.LowStockCount</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudPaper Class="pa-3 text-center" Style="background: #fee2e2;">
+                <MudText Typo="Typo.subtitle2">منتهي</MudText>
+                <MudText Typo="Typo.h5" Color="Color.Error">@report.OutOfStockCount</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudPaper Class="pa-3">
+        <MudTable Items="@report.Items" Hover="true" Bordered="true" Dense="true">
+            <HeaderContent>
+                <MudTh>الصنف</MudTh>
+                <MudTh>الكود</MudTh>
+                <MudTh>الفرع</MudTh>
+                <MudTh>الكمية</MudTh>
+                <MudTh>متوسط التكلفة</MudTh>
+                <MudTh>سعر البيع</MudTh>
+                <MudTh>قيمة المخزون</MudTh>
+                <MudTh>الحالة</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.ProductName</MudTd>
+                <MudTd>@context.SKU</MudTd>
+                <MudTd>@context.BranchName</MudTd>
+                <MudTd>@context.Quantity</MudTd>
+                <MudTd>@context.AverageCost.ToString("N2")</MudTd>
+                <MudTd>@context.SellingPrice.ToString("N2")</MudTd>
+                <MudTd><strong>@context.TotalValue.ToString("N2")</strong></MudTd>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)">@context.Status</MudChip>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudPaper>
+}
+
+@code {
+    private InventoryReportDto? report;
+    private bool loading = false;
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        loading = true;
+        try { report = await ReportsService.GetInventoryReportAsync(Session.BrandId); }
+        finally { loading = false; }
+    }
+
+    private Color GetStatusColor(string status) => status switch
+    {
+        "متوفر" => Color.Success,
+        "منخفض" => Color.Warning,
+        "نفذ" => Color.Error,
+        _ => Color.Default
+    };
+}

@@ -1,0 +1,85 @@
+@inject ISupplierService SupplierService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.SupplierName" Label="اسم المورد *" Variant="Variant.Outlined" Required="true" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.CompanyName" Label="اسم الشركة" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.Phone" Label="الهاتف" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.Email" Label="البريد الإلكتروني" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.TaxNumber" Label="الرقم الضريبي" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.PaymentTerms" Label="شروط الدفع" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="model.Address" Label="العنوان" Variant="Variant.Outlined" Lines="2" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="model.Notes" Label="ملاحظات" Variant="Variant.Outlined" Lines="2" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">إلغاء</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">حفظ</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public SupplierDto? Supplier { get; set; }
+    private CreateSupplierRequest model = new();
+
+    protected override void OnInitialized()
+    {
+        if (Supplier != null)
+        {
+            model = new CreateSupplierRequest
+            {
+                SupplierName = Supplier.SupplierName,
+                CompanyName = Supplier.CompanyName,
+                Phone = Supplier.Phone,
+                Email = Supplier.Email,
+                Address = Supplier.Address,
+                TaxNumber = Supplier.TaxNumber,
+                PaymentTerms = Supplier.PaymentTerms,
+                Notes = Supplier.Notes
+            };
+        }
+    }
+
+    private async Task Submit()
+    {
+        if (string.IsNullOrWhiteSpace(model.SupplierName))
+        {
+            Snackbar.Add("ادخل اسم المورد", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            if (Supplier == null)
+                await SupplierService.CreateSupplierAsync(Session.BrandId, model);
+            else
+                await SupplierService.UpdateSupplierAsync(Supplier.SupplierId, Session.BrandId, model);
+
+            Snackbar.Add("تم الحفظ", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { Snackbar.Add($"خطأ: {ex.Message}", Severity.Error); }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

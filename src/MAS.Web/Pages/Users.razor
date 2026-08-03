@@ -1,0 +1,120 @@
+@page "/users"
+@inject IUserService UserService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>المستخدمين - MAS</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12" Class="d-flex justify-space-between align-center">
+        <MudText Typo="Typo.h4">المستخدمين</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" 
+                   StartIcon="@Icons.Material.Filled.PersonAdd"
+                   Disabled="@(users != null && users.Count(u => u.IsActive) >= 10)"
+                   OnClick="OpenAddDialog">
+            إضافة مستخدم
+        </MudButton>
+    </MudItem>
+</MudGrid>
+
+<MudAlert Severity="Severity.Info" Class="my-3">
+    @if (users != null)
+    {
+        <MudText>المستخدمين النشطين: <strong>@users.Count(u => u.IsActive) / 10</strong></MudText>
+    }
+</MudAlert>
+
+<MudPaper Class="pa-4">
+    @if (users == null)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else
+    {
+        <MudTable Items="@users" Hover="true" Bordered="true">
+            <HeaderContent>
+                <MudTh>اسم المستخدم</MudTh>
+                <MudTh>الاسم الكامل</MudTh>
+                <MudTh>البريد</MudTh>
+                <MudTh>الهاتف</MudTh>
+                <MudTh>الدور</MudTh>
+                <MudTh>الفروع</MudTh>
+                <MudTh>الحالة</MudTh>
+                <MudTh>الإجراءات</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Username</MudTd>
+                <MudTd>@context.FullName</MudTd>
+                <MudTd>@context.Email</MudTd>
+                <MudTd>@context.Phone</MudTd>
+                <MudTd>@TranslateRole(context.Role)</MudTd>
+                <MudTd>@context.BranchIds.Count</MudTd>
+                <MudTd>
+                    <MudChip T="string" Color="@(context.IsActive ? Color.Success : Color.Default)" Size="Size.Small">
+                        @(context.IsActive ? "نشط" : "متوقف")
+                    </MudChip>
+                </MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" 
+                                   OnClick="() => OpenEditDialog(context)" />
+                    @if (context.UserId != Session.UserId)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                       OnClick="() => DeleteUser(context)" />
+                    }
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private List<UserDto>? users;
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        if (Session.IsAuthenticated)
+            users = await UserService.GetUsersAsync(Session.BrandId);
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var dialog = DialogService.Show<UserDialog>("إضافة مستخدم", new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadData();
+    }
+
+    private async Task OpenEditDialog(UserDto user)
+    {
+        var parameters = new DialogParameters { ["User"] = user };
+        var dialog = DialogService.Show<UserDialog>("تعديل المستخدم", parameters, new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadData();
+    }
+
+    private async Task DeleteUser(UserDto user)
+    {
+        var confirm = await DialogService.ShowMessageBox("تأكيد", $"حذف المستخدم {user.FullName}؟",
+            yesText: "حذف", cancelText: "إلغاء");
+        if (confirm == true)
+        {
+            await UserService.DeleteUserAsync(user.UserId, Session.BrandId);
+            Snackbar.Add("تم الحذف", Severity.Success);
+            await LoadData();
+        }
+    }
+
+    private string TranslateRole(string role) => role switch
+    {
+        "Owner" => "مالك",
+        "BrandAdmin" => "مدير براند",
+        "BranchManager" => "مدير فرع",
+        "Cashier" => "كاشير",
+        "Warehouse" => "مخزن",
+        "Accountant" => "محاسب",
+        _ => role
+    };
+}

@@ -1,0 +1,215 @@
+@inject IPurchaseService PurchaseService
+@inject IProductService ProductService
+@inject IBranchService BranchService
+@inject ISupplierService SupplierService
+@inject IWarehouseService WarehouseService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12" md="4">
+                <MudSelect T="string" @bind-Value="model.PurchaseType" Label="نوع الفاتورة *" Variant="Variant.Outlined">
+                    <MudSelectItem Value="@("Finished")">📦 منتجات تامة</MudSelectItem>
+                    <MudSelectItem Value="@("RawMaterial")">🧪 خامات للتصنيع</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudSelect T="int" @bind-Value="model.BranchId" Label="الفرع *" Variant="Variant.Outlined">
+                    @if (branches != null)
+                    {
+                        @foreach (var b in branches)
+                        {
+                            <MudSelectItem T="int" Value="b.BranchId">@b.BranchName</MudSelectItem>
+                        }
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudSelect T="int?" @bind-Value="model.WarehouseId" Label="المخزن" Variant="Variant.Outlined">
+                    <MudSelectItem T="int?" Value="null">- بدون مخزن محدد -</MudSelectItem>
+                    @if (warehouses != null)
+                    {
+                        @foreach (var w in FilteredWarehouses)
+                        {
+                            <MudSelectItem T="int?" Value="w.WarehouseId">@w.WarehouseName (@TranslateType(w.WarehouseType))</MudSelectItem>
+                        }
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudSelect T="int?" @bind-Value="model.SupplierId" Label="المورد (من القائمة)" Variant="Variant.Outlined">
+                    <MudSelectItem T="int?" Value="null">- اختر مورد -</MudSelectItem>
+                    @if (suppliers != null)
+                    {
+                        @foreach (var s in suppliers)
+                        {
+                            <MudSelectItem T="int?" Value="s.SupplierId">@s.SupplierName</MudSelectItem>
+                        }
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="model.SupplierName" Label="أو اكتب اسم المورد" Variant="Variant.Outlined" />
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudText Typo="Typo.h6" Class="mt-2">📦 الأصناف</MudText>
+                <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.Add" Color="Color.Primary" OnClick="AddItem">
+                    إضافة صنف
+                </MudButton>
+            </MudItem>
+            @for (int i = 0; i < items.Count; i++)
+            {
+                var idx = i;
+                <MudItem xs="12">
+                    <MudPaper Class="pa-2">
+                        <MudGrid>
+                            <MudItem xs="12" md="5">
+                                <MudSelect T="int" @bind-Value="items[idx].VariantId" Label="الصنف *" Variant="Variant.Outlined">
+                                    @if (products != null)
+                                    {
+                                        @foreach (var p in products)
+                                        {
+                                            @foreach (var v in p.Variants)
+                                            {
+                                                <MudSelectItem T="int" Value="v.VariantId">@(v.VariantName ?? p.ProductName)</MudSelectItem>
+                                            }
+                                        }
+                                    }
+                                </MudSelect>
+                            </MudItem>
+                            <MudItem xs="6" md="3">
+                                <MudNumericField @bind-Value="items[idx].Quantity" Label="الكمية" Variant="Variant.Outlined" Min="0" Format="N3" />
+                            </MudItem>
+                            <MudItem xs="6" md="3">
+                                <MudNumericField @bind-Value="items[idx].UnitCost" Label="سعر الوحدة" Variant="Variant.Outlined" Min="0" Format="N2" />
+                            </MudItem>
+                            <MudItem xs="12" md="1">
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" 
+                                               OnClick="@(() => RemoveItem(idx))" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudPaper>
+                </MudItem>
+            }
+            <MudItem xs="12" md="4">
+                <MudNumericField @bind-Value="model.ShippingCost" Label="تكلفة الشحن" Variant="Variant.Outlined" Min="0" Format="N2" />
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudNumericField @bind-Value="model.PaidAmount" Label="المبلغ المدفوع" Variant="Variant.Outlined" Min="0" Format="N2" />
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudSelect @bind-Value="model.PaymentMethod" Label="طريقة الدفع" Variant="Variant.Outlined">
+                    <MudSelectItem Value="@("Cash")">كاش</MudSelectItem>
+                    <MudSelectItem Value="@("Visa")">فيزا</MudSelectItem>
+                    <MudSelectItem Value="@("BankTransfer")">تحويل بنكي</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12">
+                <MudPaper Class="pa-3" Style="background: #fef3c7;">
+                    <MudGrid>
+                        <MudItem xs="6" md="3">
+                            <MudText Typo="Typo.subtitle2">إجمالي الأصناف:</MudText>
+                            <MudText Typo="Typo.h6">@CalcSubTotal().ToString("N2") ج</MudText>
+                        </MudItem>
+                        <MudItem xs="6" md="3">
+                            <MudText Typo="Typo.subtitle2">الشحن:</MudText>
+                            <MudText Typo="Typo.h6">@model.ShippingCost.ToString("N2") ج</MudText>
+                        </MudItem>
+                        <MudItem xs="6" md="3">
+                            <MudText Typo="Typo.subtitle2">الإجمالي الكلي:</MudText>
+                            <MudText Typo="Typo.h6" Color="Color.Primary">@(CalcSubTotal() + model.ShippingCost).ToString("N2") ج</MudText>
+                        </MudItem>
+                        <MudItem xs="6" md="3">
+                            <MudText Typo="Typo.subtitle2">المتبقي:</MudText>
+                            <MudText Typo="Typo.h6" Color="Color.Warning">@(CalcSubTotal() + model.ShippingCost - model.PaidAmount).ToString("N2") ج</MudText>
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">إلغاء</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@isSaving">
+            @if (isSaving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> }
+            else { <MudText>حفظ الفاتورة</MudText> }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    private CreatePurchaseRequest model = new() { PaymentMethod = "Cash", PurchaseType = "Finished" };
+    private List<ProductDto>? products;
+    private List<BranchDto>? branches;
+    private List<SupplierDto>? suppliers;
+    private List<WarehouseDto>? warehouses;
+    private List<PurchaseItemRequest> items = new();
+    private bool isSaving = false;
+
+    private List<WarehouseDto> FilteredWarehouses => warehouses?.Where(w =>
+        model.PurchaseType == "Finished" ? (w.WarehouseType == "Finished" || w.WarehouseType == "Mixed") :
+        model.PurchaseType == "RawMaterial" ? (w.WarehouseType == "RawMaterial" || w.WarehouseType == "Mixed") :
+        true).ToList() ?? new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        products = await ProductService.GetProductsAsync(Session.BrandId);
+        branches = await BranchService.GetBranchesAsync(Session.BrandId);
+        suppliers = await SupplierService.GetSuppliersAsync(Session.BrandId);
+        warehouses = await WarehouseService.GetWarehousesAsync(Session.BrandId);
+        if (branches.Any())
+            model.BranchId = Session.CurrentBranchId > 0 ? Session.CurrentBranchId : branches.First().BranchId;
+        AddItem();
+    }
+
+    private void AddItem() => items.Add(new PurchaseItemRequest());
+    private void RemoveItem(int idx) => items.RemoveAt(idx);
+    private decimal CalcSubTotal() => items.Sum(i => i.Quantity * i.UnitCost);
+
+    private string TranslateType(string type) => type switch
+    {
+        "Finished" => "تامة",
+        "RawMaterial" => "خامات",
+        "Mixed" => "مختلط",
+        _ => type
+    };
+
+    private async Task Submit()
+    {
+        if (!items.Any() || items.Any(i => i.VariantId == 0 || i.Quantity <= 0))
+        {
+            Snackbar.Add("ادخل بيانات الأصناف", Severity.Warning);
+            return;
+        }
+
+        // لو فيه SupplierId ومافيش SupplierName، نعبيها من القائمة
+        if (model.SupplierId.HasValue && string.IsNullOrEmpty(model.SupplierName))
+        {
+            var supplier = suppliers?.FirstOrDefault(s => s.SupplierId == model.SupplierId.Value);
+            if (supplier != null) model.SupplierName = supplier.SupplierName;
+        }
+
+        isSaving = true;
+        try
+        {
+            model.Items = items;
+            await PurchaseService.CreatePurchaseAsync(Session.BrandId, Session.UserId, model);
+            Snackbar.Add("تم حفظ الفاتورة وإضافة الكميات للمخزون", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطأ: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

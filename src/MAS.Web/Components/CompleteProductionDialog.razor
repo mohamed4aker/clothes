@@ -1,0 +1,104 @@
+@inject IManufacturingService ManufacturingService
+@inject UserSession Session
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.h6" Class="mb-3">✅ إكمال أمر الإنتاج: @Order.OrderNumber</MudText>
+
+        <MudGrid>
+            <MudItem xs="6">
+                <MudText Typo="Typo.subtitle2">المنتج: <strong>@Order.ProductName</strong></MudText>
+                <MudText Typo="Typo.subtitle2">المخطط: <strong>@Order.PlannedQuantity</strong> وحدة</MudText>
+            </MudItem>
+            <MudItem xs="12">
+                <MudNumericField @bind-Value="actualQty" Label="الكمية الفعلية المنتجة *" Variant="Variant.Outlined" Min="0" Required="true" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudNumericField @bind-Value="wasteQty" Label="الهالك (لو فيه)" Variant="Variant.Outlined" Min="0" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="notes" Label="ملاحظات الإنتاج" Variant="Variant.Outlined" Lines="2" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudAlert Severity="Severity.Info">
+                    عند الإكمال، سيتم خصم الخامات من المخزون وإضافة المنتج النهائي تلقائياً.
+                </MudAlert>
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">إلغاء</MudButton>
+        <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="Submit" Disabled="@isSaving">
+            @if (isSaving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> }
+            else { <MudText>إكمال الإنتاج</MudText> }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public ProductionOrderDto Order { get; set; } = null!;
+
+    private decimal actualQty = 0;
+    private decimal wasteQty = 0;
+    private string? notes;
+    private bool isSaving = false;
+
+    protected override void OnInitialized()
+    {
+        actualQty = Order.PlannedQuantity;
+    }
+
+    private async Task Submit()
+    {
+        if (actualQty <= 0)
+        {
+            Snackbar.Add("ادخل الكمية الفعلية", Severity.Warning);
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            var request = new CompleteProductionRequest
+            {
+                ProductionOrderId = Order.ProductionOrderId,
+                ActualQuantity = actualQty,
+                WasteQuantity = wasteQty,
+                Notes = notes,
+                MaterialsUsed = new List<MaterialUsageRequest>()
+            };
+
+            // هاضيف الخامات بناءً على الـ BOM المرتبط
+            var boms = await ManufacturingService.GetBomsAsync(Session.BrandId);
+            var orderBom = boms.FirstOrDefault(b => b.ProductName == Order.ProductName);
+            if (orderBom != null)
+            {
+                foreach (var item in orderBom.Items)
+                {
+                    request.MaterialsUsed.Add(new MaterialUsageRequest
+                    {
+                        RawMaterialVariantId = item.RawMaterialVariantId,
+                        ActualQuantity = item.Quantity * actualQty,
+                        WasteQuantity = item.Quantity * wasteQty * 0.1m
+                    });
+                }
+            }
+
+            await ManufacturingService.CompleteProductionAsync(Session.BrandId, Session.UserId, request);
+            Snackbar.Add("تم إكمال الإنتاج بنجاح", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطأ: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}
