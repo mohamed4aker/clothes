@@ -100,7 +100,7 @@
                 <MudTd><strong>@context.GrandTotal.ToString("N2")</strong></MudTd>
                 <MudTd>@context.PaidAmount.ToString("N2")</MudTd>
                 <MudTd>
-                    <MudChip T="string" Size="Size.Small" Color="@GetPaymentColor(context.PaymentMethod)">
+                    <MudChip Size="Size.Small" Color="@GetPaymentColor(context.PaymentMethod)">
                         @TranslatePayment(context.PaymentMethod)
                     </MudChip>
                 </MudTd>

@@ -45,7 +45,18 @@ builder.Services.AddScoped<IReportsService, ReportsService>();
 builder.Services.AddScoped<IOnlineOrderService, OnlineOrderService>();
 
 // ===== Authentication =====
-var jwtKey = builder.Configuration["Jwt:Key"] ?? "MAS-Default-Secret-Key-Change-In-Production-12345678";
+// المفتاح لازم ييجي من الإعدادات (appsettings.Production.json أو متغير بيئة Jwt__Key).
+// في الإنتاج ممنوع نستخدم مفتاح افتراضي مكتوب في الكود — ده معناه إن أي حد يقدر
+// يزوّر توكن، فبنوقف التشغيل بدل ما نشتغل بمفتاح معروف.
+var jwtKey = builder.Configuration["Jwt:Key"];
+if (string.IsNullOrWhiteSpace(jwtKey) || jwtKey.Length < 32)
+{
+    if (builder.Environment.IsDevelopment())
+        jwtKey = "MAS-Development-Only-Key-Do-Not-Use-In-Production-123456";
+    else
+        throw new InvalidOperationException(
+            "Jwt:Key غير مضبوط أو أقصر من 32 حرف. اضبطه في appsettings.Production.json أو في متغير البيئة Jwt__Key.");
+}
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {

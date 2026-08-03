@@ -1,3 +1,4 @@
+using MAS.Application.Common;
 using MAS.Application.DTOs;
 using MAS.Application.Interfaces;
 using MAS.Domain.Entities;
@@ -99,9 +100,7 @@ public class SalesReturnService : ISalesReturnService
                 .FirstOrDefaultAsync();
 
             var prefix = $"RET-{DateTime.UtcNow:yyyyMM}-";
-            var returnNumber = string.IsNullOrEmpty(lastReturn) || !lastReturn.StartsWith(prefix)
-                ? $"{prefix}001"
-                : $"{prefix}{(int.Parse(lastReturn.Substring(prefix.Length)) + 1):D3}";
+            var returnNumber = DocumentNumber.Next(prefix, lastReturn, 3);
 
             decimal subTotal = 0;
             var returnObj = new SalesReturn
@@ -275,9 +274,7 @@ public class StockTakeService : IStockTakeService
                 .Select(s => s.StockTakeNumber)
                 .FirstOrDefaultAsync();
             var prefix = $"ST-{DateTime.UtcNow:yyyyMM}-";
-            var stNumber = string.IsNullOrEmpty(lastSt) || !lastSt.StartsWith(prefix)
-                ? $"{prefix}001"
-                : $"{prefix}{(int.Parse(lastSt.Substring(prefix.Length)) + 1):D3}";
+            var stNumber = DocumentNumber.Next(prefix, lastSt, 3);
 
             var stockTake = new StockTake
             {

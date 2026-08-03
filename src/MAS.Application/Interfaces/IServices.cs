@@ -190,6 +190,13 @@ public interface IOnlineOrderService
     Task<bool> UpdateOrderStatusAsync(int orderId, int brandId, string newStatus, int userId);
     Task<bool> ConvertToInvoiceAsync(int orderId, int brandId, int branchId, int userId);
     Task<List<OnlineProductDto>> GetOnlineProductsAsync(int brandId);
+
+    /// <summary>
+    /// يرجّع بيانات المتجر المطلوب من الـ slug اللي في الرابط (‎/shop/{slug}‎).
+    /// لو الـ slug فاضي بيرجّع أول براند مفعّل عنده متجر أونلاين.
+    /// بيرجّع null لو مفيش متجر مطابق أو المتجر مقفول.
+    /// </summary>
+    Task<OnlineStoreDto?> GetStoreAsync(string? slug);
 }
 
 public interface IBrandService

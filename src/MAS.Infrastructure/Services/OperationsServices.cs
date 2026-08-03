@@ -1,3 +1,4 @@
+using MAS.Application.Common;
 using MAS.Application.DTOs;
 using MAS.Application.Interfaces;
 using MAS.Domain.Entities;
@@ -122,9 +123,7 @@ public class PurchaseService : IPurchaseService
                 .Select(p => p.InvoiceNumber)
                 .FirstOrDefaultAsync();
             var prefix = $"PUR-{DateTime.UtcNow:yyyyMM}-";
-            var invoiceNumber = string.IsNullOrEmpty(lastInv) || !lastInv.StartsWith(prefix)
-                ? $"{prefix}001"
-                : $"{prefix}{(int.Parse(lastInv.Substring(prefix.Length)) + 1):D3}";
+            var invoiceNumber = DocumentNumber.Next(prefix, lastInv, 3);
 
             decimal subTotal = 0;
             var purchase = new PurchaseInvoice

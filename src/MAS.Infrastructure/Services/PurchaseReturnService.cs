@@ -1,3 +1,4 @@
+using MAS.Application.Common;
 using MAS.Application.DTOs;
 using MAS.Application.Interfaces;
 using MAS.Domain.Entities;
@@ -52,9 +53,7 @@ public class PurchaseReturnService : IPurchaseReturnService
                 .Select(r => r.ReturnNumber)
                 .FirstOrDefaultAsync();
             var prefix = $"PRT-{DateTime.UtcNow:yyyyMM}-";
-            var returnNumber = string.IsNullOrEmpty(lastReturn) || !lastReturn.StartsWith(prefix)
-                ? $"{prefix}001"
-                : $"{prefix}{(int.Parse(lastReturn.Substring(prefix.Length)) + 1):D3}";
+            var returnNumber = DocumentNumber.Next(prefix, lastReturn, 3);
 
             var purchaseReturn = new PurchaseReturn
             {

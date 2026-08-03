@@ -6,7 +6,7 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
-<PageTitle>المتجر - MAS</PageTitle>
+<PageTitle>@storeName</PageTitle>
 
 <style>
     .shop-header {
@@ -52,7 +52,7 @@
     <MudContainer>
         <MudGrid>
             <MudItem xs="12" md="8">
-                <MudText Typo="Typo.h3">🛍️ متجر MAS</MudText>
+                <MudText Typo="Typo.h3">🛍️ @storeName</MudText>
                 <MudText Typo="Typo.subtitle1">تسوق براحتك واطلب أونلاين - الدفع عند الاستلام</MudText>
             </MudItem>
             <MudItem xs="12" md="4">
@@ -67,7 +67,14 @@
 </div>
 
 <MudContainer>
-    @if (products == null) { <MudProgressLinear Indeterminate="true" /> }
+    @if (isLoading) { <MudProgressLinear Indeterminate="true" /> }
+    else if (brandId == 0)
+    {
+        <MudAlert Severity="Severity.Warning">
+            المتجر الإلكتروني غير متاح حالياً. لو انت صاحب النظام، فعّل "المتجر الإلكتروني"
+            للبراند من صفحة البراندات واضبط له رابط (slug).
+        </MudAlert>
+    }
     else if (!FilteredProducts.Any())
     {
         <MudAlert Severity="Severity.Info">لا يوجد منتجات متاحة حالياً.</MudAlert>
@@ -121,7 +128,9 @@
     private List<OnlineProductDto>? products;
     private List<ShopCartItem> cart = new();
     private string searchText = string.Empty;
-    private int brandId = 1; // مؤقتاً - في النسخة الجاية هنحدد من الـ slug
+    private int brandId;                       // بيتحدد من الـ slug اللي في الرابط
+    private string storeName = "المتجر";
+    private bool isLoading = true;
 
     private List<OnlineProductDto> FilteredProducts =>
         products?.Where(p => string.IsNullOrEmpty(searchText) ||
@@ -129,9 +138,26 @@
 
     private decimal CartTotal => cart.Sum(c => c.UnitPrice * c.Quantity);
 
-    protected override async Task OnInitializedAsync()
+    // بيتنفّذ برضه لو المستخدم اتنقل من /shop/a لـ /shop/b من غير reload
+    protected override async Task OnParametersSetAsync()
     {
-        products = await OrderService.GetOnlineProductsAsync(brandId);
+        isLoading = true;
+        cart.Clear();
+
+        var store = await OrderService.GetStoreAsync(BrandSlug);
+        if (store == null)
+        {
+            brandId = 0;
+            products = new();
+        }
+        else
+        {
+            brandId = store.BrandId;
+            storeName = store.BrandName;
+            products = await OrderService.GetOnlineProductsAsync(brandId);
+        }
+
+        isLoading = false;
     }
 
     private void AddToCart(OnlineProductDto product)

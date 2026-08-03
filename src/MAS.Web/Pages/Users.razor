@@ -51,7 +51,7 @@
                 <MudTd>@TranslateRole(context.Role)</MudTd>
                 <MudTd>@context.BranchIds.Count</MudTd>
                 <MudTd>
-                    <MudChip T="string" Color="@(context.IsActive ? Color.Success : Color.Default)" Size="Size.Small">
+                    <MudChip Color="@(context.IsActive ? Color.Success : Color.Default)" Size="Size.Small">
                         @(context.IsActive ? "نشط" : "متوقف")
                     </MudChip>
                 </MudTd>

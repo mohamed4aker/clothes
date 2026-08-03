@@ -98,7 +98,10 @@
                     <MudNavLink Href="/brands" Icon="@Icons.Material.Filled.Business">البراندات</MudNavLink>
                     <MudNavLink Href="/branches" Icon="@Icons.Material.Filled.Store">الفروع</MudNavLink>
                     <MudNavLink Href="/settings" Icon="@Icons.Material.Filled.Tune">إعدادات النظام</MudNavLink>
-<MudNavLink Href="/reset-data" Icon="@Icons.Material.Filled.DeleteForever">⚠️ تصفير البيانات</MudNavLink>
+                    @if (Session.Role == "Owner")
+                    {
+                        <MudNavLink Href="/reset-data" Icon="@Icons.Material.Filled.DeleteForever">⚠️ تصفير البيانات</MudNavLink>
+                    }
                 </MudNavGroup>
             </MudNavMenu>
         </MudDrawer>

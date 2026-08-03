@@ -51,14 +51,14 @@ else
         <MudItem xs="12" md="4">
             <MudPaper Class="pa-4">
                 <MudText Typo="Typo.h6" Class="mb-3">معلومات</MudText>
-                <MudList T="string" Dense="true">
-                    <MudListItem T="string" Icon="@Icons.Material.Filled.Person">
+                <MudList Dense="true">
+                    <MudListItem Icon="@Icons.Material.Filled.Person">
                         <MudText Typo="Typo.subtitle2">المستخدم: @Session.FullName</MudText>
                     </MudListItem>
-                    <MudListItem T="string" Icon="@Icons.Material.Filled.Business">
+                    <MudListItem Icon="@Icons.Material.Filled.Business">
                         <MudText Typo="Typo.subtitle2">البراند: @Session.BrandName</MudText>
                     </MudListItem>
-                    <MudListItem T="string" Icon="@Icons.Material.Filled.Badge">
+                    <MudListItem Icon="@Icons.Material.Filled.Badge">
                         <MudText Typo="Typo.subtitle2">الدور: @TranslateRole(Session.Role)</MudText>
                     </MudListItem>
                 </MudList>

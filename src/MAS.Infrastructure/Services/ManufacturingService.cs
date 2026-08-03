@@ -1,3 +1,4 @@
+using MAS.Application.Common;
 using MAS.Application.DTOs;
 using MAS.Application.Interfaces;
 using MAS.Domain.Entities;
@@ -485,9 +486,6 @@ public class ManufacturingService : IManufacturingService
     private string GenerateOrderNumber(string? lastOrderNumber)
     {
         var prefix = $"PO-{DateTime.UtcNow:yyyyMM}-";
-        if (string.IsNullOrEmpty(lastOrderNumber) || !lastOrderNumber.StartsWith(prefix))
-            return $"{prefix}001";
-        var lastNumber = int.Parse(lastOrderNumber.Substring(prefix.Length));
-        return $"{prefix}{(lastNumber + 1):D3}";
+        return DocumentNumber.Next(prefix, lastOrderNumber, 3);
     }
 }

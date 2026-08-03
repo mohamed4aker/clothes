@@ -73,7 +73,7 @@ else
                     <MudTd>@context.City</MudTd>
                     <MudTd><strong>@context.GrandTotal.ToString("N2")</strong></MudTd>
                     <MudTd>
-                        <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)">@TranslateStatus(context.Status)</MudChip>
+                        <MudChip Size="Size.Small" Color="@GetStatusColor(context.Status)">@TranslateStatus(context.Status)</MudChip>
                     </MudTd>
                     <MudTd>
                         <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" OnClick="@(() => ViewOrder(context))" />

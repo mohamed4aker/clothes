@@ -892,6 +892,14 @@ public class OnlineProductDto
     public decimal Stock { get; set; }
 }
 
+// بيانات المتجر الإلكتروني اللي بتتعرض في صفحة /shop
+public class OnlineStoreDto
+{
+    public int BrandId { get; set; }
+    public string BrandName { get; set; } = string.Empty;
+    public string? Slug { get; set; }
+}
+
 // ========== Supplier (المورد) ==========
 public class SupplierDto
 {

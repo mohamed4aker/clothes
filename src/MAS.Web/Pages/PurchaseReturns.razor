@@ -72,7 +72,7 @@
                 <MudTd><strong>@context.SubTotal.ToString("N2") ج</strong></MudTd>
                 <MudTd><strong style="color: green;">@context.RefundAmount.ToString("N2") ج</strong></MudTd>
                 <MudTd>
-                    <MudChip T="string" Size="Size.Small" Color="@GetRefundColor(context.RefundMethod)">
+                    <MudChip Size="Size.Small" Color="@GetRefundColor(context.RefundMethod)">
                         @TranslateMethod(context.RefundMethod)
                     </MudChip>
                 </MudTd>

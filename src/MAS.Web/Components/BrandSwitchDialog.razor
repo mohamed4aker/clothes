@@ -17,10 +17,10 @@
         }
         else
         {
-            <MudList T="string" Clickable="true">
+            <MudList Clickable="true">
                 @foreach (var brand in brands)
                 {
-                    <MudListItem T="string" 
+                    <MudListItem 
                                  OnClick="@(() => SwitchTo(brand))"
                                  Disabled="@(brand.BrandId == Session.BrandId)">
                         <div class="d-flex align-center">
@@ -30,7 +30,7 @@
                                     <strong>@brand.BrandName</strong>
                                     @if (brand.BrandId == Session.BrandId)
                                     {
-                                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Class="ml-2">الحالي</MudChip>
+                                        <MudChip Size="Size.Small" Color="Color.Success" Class="ml-2">الحالي</MudChip>
                                     }
                                 </MudText>
                                 <MudText Typo="Typo.caption">@brand.BusinessType</MudText>

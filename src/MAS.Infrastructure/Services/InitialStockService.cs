@@ -1,3 +1,4 @@
+using MAS.Application.Common;
 using MAS.Application.DTOs;
 using MAS.Application.Interfaces;
 using MAS.Domain.Entities;
@@ -45,9 +46,7 @@ public class InitialStockService : IInitialStockService
                 .Select(s => s.EntryNumber)
                 .FirstOrDefaultAsync();
             var prefix = $"INI-{DateTime.UtcNow:yyyyMM}-";
-            var entryNumber = string.IsNullOrEmpty(lastEntry) || !lastEntry.StartsWith(prefix)
-                ? $"{prefix}001"
-                : $"{prefix}{(int.Parse(lastEntry.Substring(prefix.Length)) + 1):D3}";
+            var entryNumber = DocumentNumber.Next(prefix, lastEntry, 3);
 
             var entry = new InitialStock
             {

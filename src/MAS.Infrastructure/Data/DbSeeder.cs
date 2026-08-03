@@ -1,3 +1,4 @@
+using MAS.Application.Security;
 using MAS.Domain.Entities;
 using MAS.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -26,7 +27,7 @@ public static class DbSeeder
                 FullName = "المالك",
                 Email = "admin@maspos.com",
                 Phone = "01000000000",
-                PasswordHash = "admin",
+                PasswordHash = PasswordHasher.Hash("admin"),
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow
             };
@@ -48,7 +49,9 @@ public static class DbSeeder
                 Email = "info@mycompany.com",
                 Address = "العنوان",
                 DefaultTaxRate = 0m,
-                HasOnlineStore = false,
+                // المتجر مفتوح، لكن مفيش منتج بيظهر فيه غير لما تعلّم على
+                // "عرض أونلاين" (ShowOnline) في المنتج نفسه — فالمتجر بيفضل فاضي لحد ما تختار
+                HasOnlineStore = true,
                 OnlineStoreSlug = "shop"
             };
             context.Brands.Add(brand);
@@ -80,7 +83,7 @@ public static class DbSeeder
             FullName = "المدير",
             Email = "admin@maspos.com",
             Phone = "01000000000",
-            PasswordHash = "admin",
+            PasswordHash = PasswordHasher.Hash("admin"),
             Role = UserRole.Owner,
             IsActive = true
         };

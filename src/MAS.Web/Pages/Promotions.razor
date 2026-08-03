@@ -50,7 +50,7 @@
                 <MudTd>@context.EndDate.ToString("yyyy/MM/dd")</MudTd>
                 <MudTd>@context.UsedCount@(context.UsageLimit.HasValue ? $" / {context.UsageLimit}" : "")</MudTd>
                 <MudTd>
-                    <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)">@context.Status</MudChip>
+                    <MudChip Size="Size.Small" Color="@GetStatusColor(context.Status)">@context.Status</MudChip>
                 </MudTd>
                 <MudTd>
                     <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => OpenEdit(context))" />

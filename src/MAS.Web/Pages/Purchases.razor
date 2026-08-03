@@ -44,7 +44,7 @@
             <RowTemplate>
                 <MudTd>@context.InvoiceNumber</MudTd>
                 <MudTd>
-                    <MudChip T="string" Size="Size.Small" Color="@(context.PurchaseType == "Finished" ? Color.Success : Color.Warning)">
+                    <MudChip Size="Size.Small" Color="@(context.PurchaseType == "Finished" ? Color.Success : Color.Warning)">
                         @(context.PurchaseType == "Finished" ? "📦 تامة" : "🧪 خامات")
                     </MudChip>
                 </MudTd>

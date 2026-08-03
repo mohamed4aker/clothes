@@ -46,7 +46,7 @@
             <RowTemplate>
                 <MudTd>@context.CreatedAt.ToString("yyyy/MM/dd HH:mm")</MudTd>
                 <MudTd>
-                    <MudChip T="string" Size="Size.Small" Color="@GetMovementColor(context.MovementType.ToString())">
+                    <MudChip Size="Size.Small" Color="@GetMovementColor(context.MovementType.ToString())">
                         @TranslateMovement(context.MovementType.ToString())
                     </MudChip>
                 </MudTd>

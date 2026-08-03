@@ -1,3 +1,4 @@
+using MAS.Application.Common;
 using MAS.Application.DTOs;
 using MAS.Application.Interfaces;
 using MAS.Domain.Entities;
@@ -88,9 +89,7 @@ public class OnlineOrderService : IOnlineOrderService
             .Select(o => o.OrderNumber)
             .FirstOrDefaultAsync();
         var prefix = $"ORD-{DateTime.UtcNow:yyyyMM}-";
-        var orderNumber = string.IsNullOrEmpty(lastOrder) || !lastOrder.StartsWith(prefix)
-            ? $"{prefix}001"
-            : $"{prefix}{(int.Parse(lastOrder.Substring(prefix.Length)) + 1):D3}";
+        var orderNumber = DocumentNumber.Next(prefix, lastOrder, 3);
 
         decimal subTotal = 0;
         var order = new OnlineOrder
@@ -167,9 +166,7 @@ public class OnlineOrderService : IOnlineOrderService
                 .Select(i => i.InvoiceNumber)
                 .FirstOrDefaultAsync();
             var prefix = $"INV-{DateTime.UtcNow:yyyyMM}-";
-            var invoiceNumber = string.IsNullOrEmpty(lastInvoice) || !lastInvoice.StartsWith(prefix)
-                ? $"{prefix}00001"
-                : $"{prefix}{(int.Parse(lastInvoice.Substring(prefix.Length)) + 1):D5}";
+            var invoiceNumber = DocumentNumber.Next(prefix, lastInvoice, 5);
 
             var invoice = new SalesInvoice
             {
@@ -257,5 +254,25 @@ public class OnlineOrderService : IOnlineOrderService
             }))
             .Where(x => x.Stock > 0)
             .ToListAsync();
+    }
+
+    public async Task<OnlineStoreDto?> GetStoreAsync(string? slug)
+    {
+        var query = _context.Brands.Where(b => b.IsActive && b.HasOnlineStore);
+
+        // لو الرابط فيه slug نجيب البراند بتاعه بالظبط،
+        // لو مفيش slug نفتح أول متجر مفعّل (حالة البراند الواحد).
+        var brand = string.IsNullOrWhiteSpace(slug)
+            ? await query.OrderBy(b => b.BrandId).FirstOrDefaultAsync()
+            : await query.FirstOrDefaultAsync(b => b.OnlineStoreSlug == slug);
+
+        if (brand == null) return null;
+
+        return new OnlineStoreDto
+        {
+            BrandId = brand.BrandId,
+            BrandName = brand.BrandName,
+            Slug = brand.OnlineStoreSlug
+        };
     }
 }

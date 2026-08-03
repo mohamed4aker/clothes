@@ -109,7 +109,7 @@
                 <MudSpacer />
                 @if (selectedCustomer != null)
                 {
-                    <MudChip T="string" Color="Color.Primary" OnClose="@(() => ClearCustomer())">@selectedCustomer.FullName</MudChip>
+                    <MudChip Color="Color.Primary" OnClose="@(() => ClearCustomer())">@selectedCustomer.FullName</MudChip>
                 }
                 else
                 {

@@ -42,7 +42,7 @@
                     </span>
                 </MudTd>
                 <MudTd>
-                    <MudChip T="string" Color="@(context.Status == "Completed" ? Color.Success : Color.Default)" Size="Size.Small">
+                    <MudChip Color="@(context.Status == "Completed" ? Color.Success : Color.Default)" Size="Size.Small">
                         @(context.Status == "Completed" ? "مكتمل" : "جديد")
                     </MudChip>
                 </MudTd>

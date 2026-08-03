@@ -7,6 +7,15 @@
 
 <PageTitle>تصفير البيانات - MAS</PageTitle>
 
+@* تصفير البيانات عملية لا رجعة فيها — للمالك (Owner) بس *@
+@if (Session.Role != "Owner")
+{
+    <MudAlert Severity="Severity.Error" Class="my-4">
+        الصفحة دي للمالك (Owner) بس. لو محتاج تصفّر البيانات كلّم صاحب النظام.
+    </MudAlert>
+}
+else
+{
 <MudGrid Justify="Justify.Center">
     <MudItem xs="12" md="8">
         <MudPaper Class="pa-6">
@@ -17,25 +26,25 @@
             </MudAlert>
 
             <MudText Typo="Typo.h6" Class="mb-2">سيتم مسح:</MudText>
-            <MudList T="string" Dense="true">
-                <MudListItem T="string" Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">المنتجات والـ Variants (كل ما يظهر في POS)</MudListItem>
-                <MudListItem T="string" Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">المخزون وحركات المخزون</MudListItem>
-                <MudListItem T="string" Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">فواتير المبيعات والمشتريات والمرتجعات</MudListItem>
-                <MudListItem T="string" Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">العملاء والموردين</MudListItem>
-                <MudListItem T="string" Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">المصاريف والعروض</MudListItem>
-                <MudListItem T="string" Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">جلسات الكاشير والجرد</MudListItem>
-                <MudListItem T="string" Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">الطلبات الأونلاين</MudListItem>
-                <MudListItem T="string" Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">التصنيع (الوصفات وأوامر الإنتاج)</MudListItem>
-                <MudListItem T="string" Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">المخازن والتصنيفات</MudListItem>
-                <MudListItem T="string" Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">مخزن أول المدة</MudListItem>
+            <MudList Dense="true">
+                <MudListItem Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">المنتجات والـ Variants (كل ما يظهر في POS)</MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">المخزون وحركات المخزون</MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">فواتير المبيعات والمشتريات والمرتجعات</MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">العملاء والموردين</MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">المصاريف والعروض</MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">جلسات الكاشير والجرد</MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">الطلبات الأونلاين</MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">التصنيع (الوصفات وأوامر الإنتاج)</MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">المخازن والتصنيفات</MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">مخزن أول المدة</MudListItem>
             </MudList>
 
             <MudText Typo="Typo.h6" Class="mb-2 mt-3">سيتم الاحتفاظ بـ:</MudText>
-            <MudList T="string" Dense="true">
-                <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success">المالك (Owner)</MudListItem>
-                <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success">البراندات والفروع</MudListItem>
-                <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success">المستخدم admin@maspos.com</MudListItem>
-                <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success">وحدات القياس</MudListItem>
+            <MudList Dense="true">
+                <MudListItem Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success">المالك (Owner)</MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success">البراندات والفروع</MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success">المستخدم admin@maspos.com</MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success">وحدات القياس</MudListItem>
             </MudList>
 
             <MudDivider Class="my-4" />
@@ -54,6 +63,7 @@
         </MudPaper>
     </MudItem>
 </MudGrid>
+}
 
 @code {
     private string confirmText = string.Empty;
@@ -62,6 +72,8 @@
     private async Task ResetAll()
     {
         if (confirmText != "تصفير") return;
+        // حماية على مستوى السيرفر كمان، مش بس إخفاء الزرار
+        if (Session.Role != "Owner") return;
         isResetting = true;
 
         try

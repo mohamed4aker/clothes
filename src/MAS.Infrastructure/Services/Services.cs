@@ -1,5 +1,7 @@
+using MAS.Application.Common;
 using MAS.Application.DTOs;
 using MAS.Application.Interfaces;
+using MAS.Application.Security;
 using MAS.Domain.Entities;
 using MAS.Domain.Enums;
 using MAS.Infrastructure.Data;
@@ -25,7 +27,7 @@ public class AuthService : IAuthService
         if (user == null) return null;
         if (user.LockedUntil.HasValue && user.LockedUntil > DateTime.UtcNow) return null;
 
-        if (request.Password != user.PasswordHash)
+        if (!PasswordHasher.Verify(request.Password, user.PasswordHash))
         {
             user.FailedLoginAttempts++;
             if (user.FailedLoginAttempts >= 5)
@@ -33,6 +35,10 @@ public class AuthService : IAuthService
             await _context.SaveChangesAsync();
             return null;
         }
+
+        // لو الباسورد المخزّن لسه نص صريح (من نسخة قديمة)، نشفّره دلوقتي
+        var upgraded = PasswordHasher.UpgradeIfNeeded(request.Password, user.PasswordHash);
+        if (upgraded != null) user.PasswordHash = upgraded;
 
         user.FailedLoginAttempts = 0;
         user.LastLoginAt = DateTime.UtcNow;
@@ -641,11 +647,7 @@ public class SalesService : ISalesService
     private string GenerateInvoiceNumber(string? lastInvoiceNumber)
     {
         var prefix = $"INV-{DateTime.UtcNow:yyyyMM}-";
-        if (string.IsNullOrEmpty(lastInvoiceNumber) || !lastInvoiceNumber.StartsWith(prefix))
-            return $"{prefix}00001";
-
-        var lastNumber = int.Parse(lastInvoiceNumber.Substring(prefix.Length));
-        return $"{prefix}{(lastNumber + 1):D5}";
+        return DocumentNumber.Next(prefix, lastInvoiceNumber, 5);
     }
 }
 
@@ -857,7 +859,7 @@ public class UserService : IUserService
             FullName = request.FullName,
             Email = request.Email,
             Phone = request.Phone,
-            PasswordHash = request.Password,
+            PasswordHash = PasswordHasher.Hash(request.Password),
             Role = Enum.Parse<UserRole>(request.Role),
             PinCode = request.PinCode
         };
@@ -895,7 +897,7 @@ public class UserService : IUserService
         // لو اتبعت باسورد جديد، حدّثه (وفك أي قفل)
         if (!string.IsNullOrWhiteSpace(request.Password))
         {
-            user.PasswordHash = request.Password;
+            user.PasswordHash = PasswordHasher.Hash(request.Password);
             user.FailedLoginAttempts = 0;
             user.LockedUntil = null;
         }
@@ -936,7 +938,7 @@ public class UserService : IUserService
     {
         var user = await _context.Users.FirstOrDefaultAsync(u => u.UserId == userId && u.BrandId == brandId);
         if (user == null) return false;
-        user.PasswordHash = newPassword;
+        user.PasswordHash = PasswordHasher.Hash(newPassword);
         user.FailedLoginAttempts = 0;
         user.LockedUntil = null;
         await _context.SaveChangesAsync();

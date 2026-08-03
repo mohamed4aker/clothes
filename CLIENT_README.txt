@@ -9,8 +9,9 @@
 ----------------------------------------------------
 
 الرابط: https://yourdomain.com  (الدومين بتاعك)
-Email: admin@maspos.com
-Password: Admin@123
+Username: admin
+Password: admin
+(تقدر تدخل بالإيميل admin@maspos.com بدل اسم المستخدم)
 
 ⚠️ غير الـ Password فوراً من إعدادات الحساب
 

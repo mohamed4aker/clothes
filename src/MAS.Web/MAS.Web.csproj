@@ -7,7 +7,9 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="MudBlazor" Version="6.11.2" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.Cookies" Version="2.2.0" />
+    <!-- ملحوظة: Microsoft.AspNetCore.Authentication.Cookies 2.2.0 كان متسجّل هنا.
+         الباكدج دي بتاعة ASP.NET Core 2.2 وبتتعارض مع net8، والـ API نفسها
+         موجودة أصلاً جوه الـ Shared Framework، فاتشالت. -->
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\MAS.Application\MAS.Application.csproj" />
