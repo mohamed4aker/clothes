@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+**/logs/
+**/appsettings.Production.json
+.git/
+.github/
+__MACOSX/
+*.md
+*.txt
+*.ps1

@@ -1,0 +1,36 @@
+name: Build
+
+# بيشتغل تلقائي مع كل push أو Pull Request.
+# ده اللي بيجاوب على سؤال "هو شغال ولا لأ؟" — لو الـ build عدى،
+# يبقى المشروع بيتكمبل صح. تقدر تشوف النتيجة من تاب Actions في GitHub.
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: تجهيز .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: تحميل الباكدجات
+        run: dotnet restore MAS.sln
+
+      - name: Build
+        run: dotnet build MAS.sln --configuration Release --no-restore
+
+      - name: Publish (الملفات الجاهزة للنشر)
+        run: dotnet publish src/MAS.Web/MAS.Web.csproj -c Release -o publish --no-build
+
+      - name: رفع ناتج النشر كـ artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mas-web-publish
+          path: publish
